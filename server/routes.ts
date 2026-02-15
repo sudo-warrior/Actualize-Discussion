@@ -85,6 +85,42 @@ export async function registerRoutes(
     return res.json(updated);
   });
 
+  app.patch("/api/incidents/:id/steps/:stepIndex", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const incident = await storage.getIncident(req.params.id as string);
+    if (!incident) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    if (incident.userId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const stepIndex = parseInt(req.params.stepIndex, 10);
+    if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= incident.nextSteps.length) {
+      return res.status(400).json({ message: "Invalid step index" });
+    }
+    const updated = await storage.toggleStepCompletion(req.params.id as string, stepIndex);
+    return res.json(updated);
+  });
+
+  app.delete("/api/incidents/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const incident = await storage.getIncident(req.params.id as string);
+    if (!incident) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    if (incident.userId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deleteIncident(req.params.id as string);
+    return res.json({ success: true });
+  });
+
   app.get("/api/incidents/stats/summary", isAuthenticated, async (req: any, res) => {
     const userId = req.user?.claims?.sub;
     if (!userId) {

@@ -16,6 +16,7 @@ import {
   CartesianGrid,
   Legend
 } from "recharts";
+import { useLocation } from "wouter";
 import { 
   Activity, 
   Clock, 
@@ -23,7 +24,8 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   Zap,
-  Loader2
+  Loader2,
+  ChevronRight
 } from "lucide-react";
 
 type DashboardStats = {
@@ -39,6 +41,7 @@ type DashboardStats = {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: stats, isLoading, error } = useQuery<DashboardStats>({
     queryKey: ["/api/incidents/stats/summary"],
@@ -159,7 +162,7 @@ export default function Dashboard() {
           ) : (
             <div className="divide-y divide-border">
               {recentIncidents.map((incident) => (
-                <div key={incident.id} data-testid={`row-incident-${incident.id}`} className="p-4 flex items-center gap-4 hover:bg-muted/10 transition-colors">
+                <div key={incident.id} data-testid={`row-incident-${incident.id}`} onClick={() => navigate(`/incidents/${incident.id}`)} className="p-4 flex items-center gap-4 hover:bg-muted/10 transition-colors cursor-pointer group">
                   <div className={`p-2 rounded-full bg-muted/50 ${
                     incident.severity === "critical" ? "text-red-500" : 
                     incident.severity === "high" ? "text-amber-500" : 
@@ -182,6 +185,7 @@ export default function Dashboard() {
                   }`}>
                     {incident.severity}
                   </Badge>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               ))}
             </div>

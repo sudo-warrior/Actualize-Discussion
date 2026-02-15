@@ -7,7 +7,9 @@ import {
   Clock, 
   LogOut,
   Command,
-  Search
+  Search,
+  History,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Incident } from "@shared/schema";
@@ -19,7 +21,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, onIncidentSelect }: LayoutProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
 
   const { data: incidents = [] } = useQuery<Incident[]>({
@@ -60,6 +62,24 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
                 <Activity className="h-4 w-4" />
                 Dashboard
             </Link>
+            <Link href="/history" className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                location === "/history" 
+                  ? "bg-primary/10 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                <History className="h-4 w-4" />
+                History
+            </Link>
+            <Link href="/profile" className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                location === "/profile" 
+                  ? "bg-primary/10 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}>
+                <User className="h-4 w-4" />
+                Profile
+            </Link>
           </nav>
 
           <div className="px-4 mb-2 text-xs font-mono text-muted-foreground uppercase tracking-wider flex items-center justify-between">
@@ -74,7 +94,13 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
               <div 
                 key={item.id} 
                 data-testid={`card-incident-${item.id}`}
-                onClick={() => onIncidentSelect?.(item.id)}
+                onClick={() => {
+                  if (onIncidentSelect && location === "/") {
+                    onIncidentSelect(item.id);
+                  } else {
+                    navigate(`/incidents/${item.id}`);
+                  }
+                }}
                 className="group flex flex-col gap-1 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors border border-transparent hover:border-border/50"
               >
                 <div className="flex items-center justify-between">

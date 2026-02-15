@@ -8,6 +8,8 @@ export interface IStorage {
   getAllIncidents(): Promise<Incident[]>;
   getIncidentsByUser(userId: string): Promise<Incident[]>;
   updateIncidentStatus(id: string, status: Incident["status"]): Promise<Incident | undefined>;
+  toggleStepCompletion(id: string, stepIndex: number): Promise<Incident | undefined>;
+  deleteIncident(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -36,6 +38,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(incidents.id, id))
       .returning();
     return updated;
+  }
+
+  async toggleStepCompletion(id: string, stepIndex: number): Promise<Incident | undefined> {
+    const incident = await this.getIncident(id);
+    if (!incident) return undefined;
+    const completed = incident.completedSteps || [];
+    const newCompleted = completed.includes(stepIndex)
+      ? completed.filter(i => i !== stepIndex)
+      : [...completed, stepIndex];
+    const [updated] = await db
+      .update(incidents)
+      .set({ completedSteps: newCompleted })
+      .where(eq(incidents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteIncident(id: string): Promise<boolean> {
+    const result = await db.delete(incidents).where(eq(incidents.id, id)).returning();
+    return result.length > 0;
   }
 }
 

@@ -7,6 +7,9 @@ import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
+import History from "@/pages/History";
+import Profile from "@/pages/Profile";
+import IncidentDetail from "@/pages/IncidentDetail";
 import Landing from "@/pages/Landing";
 import { Loader2 } from "lucide-react";
 
@@ -15,6 +18,9 @@ function AuthenticatedRouter() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/history" component={History} />
+      <Route path="/profile" component={Profile} />
+      <Route path="/incidents/:id" component={IncidentDetail} />
       <Route component={NotFound} />
     </Switch>
   );

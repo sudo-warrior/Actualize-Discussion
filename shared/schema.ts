@@ -18,6 +18,7 @@ export const incidents = pgTable("incidents", {
   fix: text("fix").notNull(),
   evidence: text("evidence").array().notNull(),
   nextSteps: text("next_steps").array().notNull(),
+  completedSteps: integer("completed_steps").array().notNull().default(sql`'{}'::integer[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import type { Incident } from "@shared/schema";
+import { useLocation } from "wouter";
 import { 
   Play, 
   Terminal, 
@@ -18,13 +19,16 @@ import {
   Loader2,
   Search,
   Activity,
-  ChevronRight
+  Check,
+  ExternalLink,
+  CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [logs, setLogs] = useState("");
   const [result, setResult] = useState<Incident | null>(null);
 
@@ -67,6 +71,35 @@ export default function Home() {
     } catch {
       toast({ title: "Failed to load incident", variant: "destructive" });
     }
+  };
+
+  const toggleStepMutation = useMutation({
+    mutationFn: async ({ incidentId, stepIndex }: { incidentId: string; stepIndex: number }) => {
+      const res = await apiRequest("PATCH", `/api/incidents/${incidentId}/steps/${stepIndex}`);
+      return res.json() as Promise<Incident>;
+    },
+    onSuccess: (data) => {
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Session expired", description: "Redirecting to login...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Failed to update step", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleStepToggle = (stepIndex: number) => {
+    if (!result) return;
+    toggleStepMutation.mutate({ incidentId: result.id, stepIndex });
+  };
+
+  const copyStepToClipboard = (step: string) => {
+    navigator.clipboard.writeText(step);
+    toast({ title: "Copied", description: "Action copied to clipboard." });
   };
 
   const copyToClipboard = () => {
@@ -228,24 +261,56 @@ export default function Home() {
                 </Card>
 
                 <div className="grid grid-cols-1 gap-3">
-                  <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-2 mt-2">
-                    <Activity className="h-4 w-4" /> Recommended Actions
-                  </h3>
-                  {result.nextSteps.map((step, i) => (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1 + 0.3 }}
-                      className="bg-card border border-border p-4 rounded-lg flex items-center gap-3 hover:border-primary/50 transition-colors group cursor-pointer hover:bg-accent/5"
+                  <div className="flex items-center justify-between mt-2">
+                    <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Activity className="h-4 w-4" /> Recommended Actions
+                    </h3>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {(result.completedSteps || []).length}/{result.nextSteps.length} done
+                    </span>
+                  </div>
+                  {result.nextSteps.map((step, i) => {
+                    const isDone = (result.completedSteps || []).includes(i);
+                    return (
+                      <motion.div 
+                        key={i}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 + 0.3 }}
+                        className={`bg-card border p-4 rounded-lg flex items-center gap-3 transition-all group ${isDone ? "border-emerald-500/30 bg-emerald-500/5" : "border-border hover:border-primary/50 hover:bg-accent/5"}`}
+                      >
+                        <button
+                          data-testid={`button-toggle-step-${i}`}
+                          onClick={() => handleStepToggle(i)}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-colors border ${isDone ? "bg-emerald-500 border-emerald-500 text-white" : "bg-muted border-border hover:border-primary hover:bg-primary/20"}`}
+                        >
+                          {isDone ? <Check className="h-3 w-3" /> : <span className="text-xs font-mono">{i + 1}</span>}
+                        </button>
+                        <span className={`text-sm font-medium flex-1 ${isDone ? "line-through text-muted-foreground" : ""}`}>{step}</span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            data-testid={`button-copy-step-${i}`}
+                            onClick={(e) => { e.stopPropagation(); copyStepToClipboard(step); }}
+                            className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            title="Copy action"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                  {result.nextSteps.length > 0 && (
+                    <Button 
+                      data-testid="button-view-incident-detail"
+                      variant="outline" 
+                      onClick={() => navigate(`/incidents/${result.id}`)}
+                      className="font-mono text-xs border-primary/20 text-primary hover:bg-primary/10 mt-2"
                     >
-                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-mono group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">
-                        {i + 1}
-                      </div>
-                      <span className="text-sm font-medium">{step}</span>
-                      <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </motion.div>
-                  ))}
+                      <ExternalLink className="mr-2 h-3 w-3" />
+                      VIEW FULL INCIDENT DETAILS
+                    </Button>
+                  )}
                 </div>
               </motion.div>
             )}

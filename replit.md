@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 - **Framework**: React with TypeScript, bundled by Vite
-- **Routing**: Wouter with three views: Landing (unauthenticated), Home (`/`), Dashboard (`/dashboard`)
+- **Routing**: Wouter with views: Landing (unauthenticated), Home (`/`), Dashboard (`/dashboard`), History (`/history`), Profile (`/profile`), Incident Detail (`/incidents/:id`)
 - **Authentication**: Replit Auth via `useAuth()` hook. Landing page shown when logged out.
 - **State Management**: TanStack React Query for server state, local React state for UI
 - **UI Components**: shadcn/ui component library (new-york style) built on Radix UI primitives
@@ -56,7 +56,7 @@ Preferred communication style: Simple, everyday language.
 - **DB Module**: `server/db.ts` exports shared `db` instance used by all storage modules
 - **Schema Push**: Use `npm run db:push` to sync schema to database
 - **Tables**:
-  - `incidents` — id (UUID), userId, title, severity, status, confidence, rawLogs, rootCause, fix, evidence[], nextSteps[], createdAt
+  - `incidents` — id (UUID), userId, title, severity, status, confidence, rawLogs, rootCause, fix, evidence[], nextSteps[], completedSteps[], createdAt
   - `users` — Replit Auth user records (id, email, firstName, lastName, profileImageUrl)
   - `sessions` — Express session storage for auth
   - `conversations` / `messages` — Chat integration tables (from Gemini blueprint)
