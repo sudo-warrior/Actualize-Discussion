@@ -81,18 +81,18 @@ export default function History() {
 
   return (
     <Layout>
-      <div className="flex-1 overflow-y-auto p-8 relative z-10">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight mb-2 font-sans text-foreground">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
+        <header className="mb-4 md:mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1 md:mb-2 font-sans text-foreground">
             Incident History
           </h1>
-          <p className="text-muted-foreground font-mono text-sm">
+          <p className="text-muted-foreground font-mono text-xs md:text-sm">
             Browse and search through all past incident analyses.
           </p>
         </header>
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3 mb-4 md:mb-6">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               data-testid="input-search-incidents"
@@ -102,15 +102,15 @@ export default function History() {
               className="pl-10 bg-card/50 border-border font-mono text-sm"
             />
           </div>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-1 bg-card/50 border border-border rounded-md p-1">
-              <Filter className="h-3 w-3 text-muted-foreground ml-2" />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex items-center gap-1 bg-card/50 border border-border rounded-md p-1 overflow-x-auto">
+              <Filter className="h-3 w-3 text-muted-foreground ml-2 shrink-0" />
               {severities.map((s) => (
                 <button
                   key={s}
                   data-testid={`button-filter-${s}`}
                   onClick={() => setSeverityFilter(s)}
-                  className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                  className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors whitespace-nowrap ${
                     severityFilter === s
                       ? "bg-primary/20 text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -120,14 +120,14 @@ export default function History() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-1 bg-card/50 border border-border rounded-md p-1">
-              <SortDesc className="h-3 w-3 text-muted-foreground ml-2" />
+            <div className="flex items-center gap-1 bg-card/50 border border-border rounded-md p-1 overflow-x-auto">
+              <SortDesc className="h-3 w-3 text-muted-foreground ml-2 shrink-0" />
               {sorts.map((s) => (
                 <button
                   key={s.value}
                   data-testid={`button-sort-${s.value}`}
                   onClick={() => setSortBy(s.value)}
-                  className={`px-2 py-1 rounded text-[10px] font-mono tracking-wider transition-colors ${
+                  className={`px-2 py-1 rounded text-[10px] font-mono tracking-wider transition-colors whitespace-nowrap ${
                     sortBy === s.value
                       ? "bg-primary/20 text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -168,26 +168,26 @@ export default function History() {
                   key={incident.id}
                   data-testid={`card-history-incident-${incident.id}`}
                   onClick={() => navigate(`/incidents/${incident.id}`)}
-                  className="p-5 bg-card/50 border-border hover:border-primary/30 transition-all cursor-pointer group"
+                  className="p-3 md:p-5 bg-card/50 border-border hover:border-primary/30 transition-all cursor-pointer group"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-2 rounded-full bg-muted/50 mt-0.5 ${severityColor(incident.severity)}`}>
-                      <AlertTriangle className="h-4 w-4" />
+                  <div className="flex items-start gap-3 md:gap-4">
+                    <div className={`p-1.5 md:p-2 rounded-full bg-muted/50 mt-0.5 ${severityColor(incident.severity)}`}>
+                      <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3 mb-1">
-                        <h3 className="text-sm font-medium truncate">{incident.title}</h3>
-                        <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h3 className="text-xs md:text-sm font-medium truncate">{incident.title}</h3>
+                        <div className="flex items-center gap-1 md:gap-2 shrink-0">
                           <Badge variant="outline" className={`text-[10px] font-mono ${severityColor(incident.severity)} border-current/20`}>
                             {incident.severity}
                           </Badge>
-                          <Badge variant="outline" className="text-[10px] font-mono border-primary/20 text-primary">
+                          <Badge variant="outline" className="text-[10px] font-mono border-primary/20 text-primary hidden sm:inline-flex">
                             {incident.confidence}%
                           </Badge>
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate mb-2">{incident.rootCause}</p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
+                      <p className="text-[10px] md:text-xs text-muted-foreground truncate mb-2">{incident.rootCause}</p>
+                      <div className="flex flex-wrap items-center gap-2 md:gap-4 text-[10px] md:text-xs text-muted-foreground font-mono">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatDistanceToNow(new Date(incident.createdAt), { addSuffix: true })}
@@ -198,7 +198,7 @@ export default function History() {
                         </span>
                         {incident.nextSteps.length > 0 && (
                           <span className="flex items-center gap-1">
-                            <div className="h-1.5 w-12 bg-muted rounded-full overflow-hidden">
+                            <div className="h-1.5 w-8 md:w-12 bg-muted rounded-full overflow-hidden">
                               <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${progress}%` }} />
                             </div>
                             {completedSteps.length}/{incident.nextSteps.length}
@@ -206,7 +206,7 @@ export default function History() {
                         )}
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1 hidden sm:block" />
                   </div>
                 </Card>
               );

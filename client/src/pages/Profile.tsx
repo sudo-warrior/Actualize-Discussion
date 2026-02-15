@@ -47,17 +47,17 @@ export default function Profile() {
 
   return (
     <Layout>
-      <div className="flex-1 overflow-y-auto p-8 relative z-10">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight mb-2 font-sans text-foreground">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
+        <header className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1 md:mb-2 font-sans text-foreground">
             Profile
           </h1>
-          <p className="text-muted-foreground font-mono text-sm">
+          <p className="text-muted-foreground font-mono text-xs md:text-sm">
             Your account and activity overview.
           </p>
         </header>
 
-        <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20">
+        <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-20">
           <div className="lg:col-span-1 space-y-6">
             <Card className="p-6 bg-card/50 border-border text-center">
               {user?.profileImageUrl ? (
