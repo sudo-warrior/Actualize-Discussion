@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { 
   Activity, 
   Terminal, 
   Clock, 
-  Settings, 
+  LogOut,
   Command,
   Search
 } from "lucide-react";
@@ -19,6 +20,7 @@ interface LayoutProps {
 
 export default function Layout({ children, onIncidentSelect }: LayoutProps) {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   const { data: incidents = [] } = useQuery<Incident[]>({
     queryKey: ["/api/incidents"],
@@ -40,8 +42,7 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
         <div className="flex-1 overflow-y-auto py-4">
           <div className="px-4 mb-2 text-xs font-mono text-muted-foreground uppercase tracking-wider">Menu</div>
           <nav className="space-y-1 px-2 mb-8">
-            <Link href="/">
-              <a className={cn(
+            <Link href="/" className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 location === "/" 
                   ? "bg-primary/10 text-primary" 
@@ -49,10 +50,8 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
               )}>
                 <Command className="h-4 w-4" />
                 New Analysis
-              </a>
             </Link>
-            <Link href="/dashboard">
-              <a className={cn(
+            <Link href="/dashboard" className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 location === "/dashboard" 
                   ? "bg-primary/10 text-primary" 
@@ -60,7 +59,6 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
               )}>
                 <Activity className="h-4 w-4" />
                 Dashboard
-              </a>
             </Link>
           </nav>
 
@@ -75,6 +73,7 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
             {recentIncidents.map((item) => (
               <div 
                 key={item.id} 
+                data-testid={`card-incident-${item.id}`}
                 onClick={() => onIncidentSelect?.(item.id)}
                 className="group flex flex-col gap-1 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors border border-transparent hover:border-border/50"
               >
@@ -97,21 +96,34 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
 
         <div className="p-4 border-t border-border bg-card/30">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 text-primary font-bold">
-              OP
-            </div>
+            {user?.profileImageUrl ? (
+              <img src={user.profileImageUrl} alt="" className="h-8 w-8 rounded border border-primary/30 object-cover" />
+            ) : (
+              <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 text-primary font-bold text-xs">
+                {(user?.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Operator_01</p>
-              <p className="text-xs text-muted-foreground truncate">System Admin</p>
+              <p className="text-sm font-medium truncate">
+                {user?.firstName ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}` : user?.email || "Operator"}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email || "System Admin"}</p>
             </div>
-            <Settings className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-pointer" />
+            <button
+              data-testid="button-logout"
+              onClick={() => logout()}
+              className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-        <div className="absolute inset-0 bg-radial-[circle_800px_at_50%_-20%] from-primary/5 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 pointer-events-none" style={{background: "radial-gradient(circle 800px at 50% -20%, hsl(var(--primary) / 0.05), transparent)"}} />
         {children}
       </main>
     </div>

@@ -13,29 +13,38 @@ export async function registerRoutes(
   registerAuthRoutes(app);
 
   app.post("/api/incidents/analyze", isAuthenticated, async (req: any, res) => {
-    const parsed = analyzeLogsSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+    try {
+      const parsed = analyzeLogsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { logs } = parsed.data;
+      const analysis = await analyzeLogs(logs);
+
+      const incident = await storage.createIncident({
+        title: analysis.title,
+        severity: analysis.severity,
+        status: "resolved",
+        confidence: analysis.confidence,
+        rawLogs: logs,
+        rootCause: analysis.rootCause,
+        fix: analysis.fix,
+        evidence: analysis.evidence,
+        nextSteps: analysis.nextSteps,
+        userId,
+      });
+
+      return res.status(201).json(incident);
+    } catch (error) {
+      console.error("Analysis error:", error);
+      return res.status(500).json({ message: "Analysis failed. Please try again." });
     }
-
-    const userId = req.user?.claims?.sub;
-    const { logs } = parsed.data;
-    const analysis = await analyzeLogs(logs);
-
-    const incident = await storage.createIncident({
-      title: analysis.title,
-      severity: analysis.severity,
-      status: "resolved",
-      confidence: analysis.confidence,
-      rawLogs: logs,
-      rootCause: analysis.rootCause,
-      fix: analysis.fix,
-      evidence: analysis.evidence,
-      nextSteps: analysis.nextSteps,
-      userId: userId || null,
-    });
-
-    return res.status(201).json(incident);
   });
 
   app.get("/api/incidents", isAuthenticated, async (req: any, res) => {
@@ -53,7 +62,7 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Incident not found" });
     }
     const userId = req.user?.claims?.sub;
-    if (incident.userId && incident.userId !== userId) {
+    if (incident.userId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
     return res.json(incident);
@@ -64,10 +73,15 @@ export async function registerRoutes(
     if (!["analyzing", "resolved", "critical"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
-    const updated = await storage.updateIncidentStatus(req.params.id as string, status);
-    if (!updated) {
+    const userId = req.user?.claims?.sub;
+    const incident = await storage.getIncident(req.params.id as string);
+    if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
     }
+    if (incident.userId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const updated = await storage.updateIncidentStatus(req.params.id as string, status);
     return res.json(updated);
   });
 

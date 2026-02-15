@@ -48,20 +48,8 @@ Severity guidelines:
 Always provide actionable, specific fixes — not generic advice. Reference specific log lines in your evidence.
 Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.`;
 
-const BYPASS_PREFIX = "BYPASS_ANALYSIS_MODE:";
-
 export async function analyzeLogs(rawLogs: string): Promise<AnalysisResult> {
-  let inputForAI = rawLogs;
-  let isBypassed = false;
-
-  if (rawLogs.startsWith(BYPASS_PREFIX)) {
-    isBypassed = true;
-    inputForAI = rawLogs.slice(BYPASS_PREFIX.length).trim();
-  }
-
-  const prompt = isBypassed
-    ? inputForAI
-    : `Analyze the following logs and identify the root cause:\n\n${inputForAI}`;
+  const prompt = `Analyze the following logs and identify the root cause:\n\n${rawLogs}`;
 
   try {
     const response = await ai.models.generateContent({
@@ -71,7 +59,7 @@ export async function analyzeLogs(rawLogs: string): Promise<AnalysisResult> {
       ],
       config: {
         maxOutputTokens: 8192,
-        systemInstruction: isBypassed ? undefined : SYSTEM_PROMPT,
+        systemInstruction: SYSTEM_PROMPT,
       },
     });
 

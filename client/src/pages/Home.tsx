@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { isUnauthorizedError } from "@/lib/auth-utils";
 import type { Incident } from "@shared/schema";
 import { 
   Play, 
@@ -37,6 +38,11 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
     },
     onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Session expired", description: "Redirecting to login...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
       toast({ title: "Analysis failed", description: error.message, variant: "destructive" });
     }
   });
