@@ -142,25 +142,25 @@ export default function Home() {
 
   return (
     <Layout onIncidentSelect={handleIncidentSelect}>
-      <div className="flex-1 overflow-y-auto p-8 relative z-10">
-        <header className="mb-8 flex items-end justify-between">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
+        <header className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight mb-2 font-sans text-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1 md:mb-2 font-sans text-foreground">
               Incident Analysis
             </h1>
-            <p className="text-muted-foreground font-mono text-sm">
+            <p className="text-muted-foreground font-mono text-xs md:text-sm">
               Paste logs below to identify root cause and generate fixes.
             </p>
           </div>
           {isComplete && (
-            <Button variant="outline" onClick={handleReset} className="font-mono text-xs border-primary/20 text-primary hover:bg-primary/10">
+            <Button variant="outline" onClick={handleReset} className="font-mono text-xs border-primary/20 text-primary hover:bg-primary/10 self-start sm:self-auto">
               <Terminal className="mr-2 h-3 w-3" />
               NEW SESSION
             </Button>
           )}
         </header>
 
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 pb-20">
           <div className={`transition-all duration-500 ease-in-out ${isComplete ? "lg:col-span-5" : "lg:col-span-12"}`}>
             <div className="mb-4 font-mono text-xs text-muted-foreground flex items-center gap-2 px-1 opacity-70">
               <span className="text-green-500">$</span>
@@ -169,7 +169,7 @@ export default function Home() {
               <span className="animate-pulse">_</span>
             </div>
 
-            <Card className="h-[60vh] bg-card/80 backdrop-blur-md border-border flex flex-col overflow-hidden shadow-2xl relative group">
+            <Card className="h-[50vh] md:h-[60vh] bg-card/80 backdrop-blur-md border-border flex flex-col overflow-hidden shadow-2xl relative group">
               <div className="p-3 border-b border-border flex items-center justify-between bg-muted/30">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1.5">

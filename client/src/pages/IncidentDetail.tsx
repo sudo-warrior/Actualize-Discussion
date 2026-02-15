@@ -147,31 +147,33 @@ export default function IncidentDetail() {
 
   return (
     <Layout>
-      <div className="flex-1 overflow-y-auto p-8 relative z-10">
-        <div className="flex items-center gap-3 mb-6">
-          <Button data-testid="button-back" variant="ghost" size="icon" onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 data-testid="text-incident-title" className="text-2xl font-bold tracking-tight font-sans text-foreground">
-              {incident.title}
-            </h1>
-            <p className="text-xs text-muted-foreground font-mono mt-1 flex items-center gap-2">
-              <Clock className="h-3 w-3" />
-              {format(new Date(incident.createdAt), "MMM d, yyyy 'at' h:mm a")} ({formatDistanceToNow(new Date(incident.createdAt), { addSuffix: true })})
-            </p>
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 md:mb-6">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Button data-testid="button-back" variant="ghost" size="icon" onClick={() => navigate("/history")} className="text-muted-foreground hover:text-foreground shrink-0">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="min-w-0">
+              <h1 data-testid="text-incident-title" className="text-lg md:text-2xl font-bold tracking-tight font-sans text-foreground truncate">
+                {incident.title}
+              </h1>
+              <p className="text-[10px] md:text-xs text-muted-foreground font-mono mt-1 flex items-center gap-1 md:gap-2">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span className="truncate">{format(new Date(incident.createdAt), "MMM d, yyyy")} ({formatDistanceToNow(new Date(incident.createdAt), { addSuffix: true })})</span>
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-11 sm:ml-0 shrink-0">
             <Badge className={`${severityColor(incident.severity)} text-[10px] font-mono uppercase tracking-wider`}>
               {incident.severity}
             </Badge>
             <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary bg-primary/5">
-              {incident.confidence}% confidence
+              {incident.confidence}%
             </Badge>
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-20">
           <div className="lg:col-span-2 space-y-6">
             <Card className="p-6 border-l-4 border-l-red-500 bg-gradient-to-br from-card to-card/50 relative group">
               <div className="flex items-center gap-2 mb-3 text-red-500">

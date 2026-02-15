@@ -18,7 +18,7 @@ export default function Landing() {
       <div className="absolute inset-0 pointer-events-none" style={{background: "radial-gradient(circle 800px at 50% -20%, hsl(var(--primary) / 0.08), transparent)"}} />
 
       <nav className="relative z-10 border-b border-border/50 backdrop-blur-md bg-background/80">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 text-primary">
             <Terminal className="h-5 w-5" />
             <span className="font-bold text-lg tracking-tight">INCIDENT<span className="text-muted-foreground">.CMD</span></span>
@@ -32,19 +32,19 @@ export default function Landing() {
         </div>
       </nav>
 
-      <main className="flex-1 relative z-10 flex flex-col items-center justify-center px-6 py-20">
-        <div className="max-w-4xl mx-auto text-center mb-16">
+      <main className="flex-1 relative z-10 flex flex-col items-center justify-center px-4 md:px-6 py-12 md:py-20">
+        <div className="max-w-4xl mx-auto text-center mb-10 md:mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-mono mb-8">
             <Zap className="h-3 w-3" />
             AI-POWERED INCIDENT ANALYSIS
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">
             Decode Errors.<br />
             <span className="text-primary">Resolve Faster.</span>
           </h1>
 
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed px-2">
             Paste your server logs, stack traces, or error output. Our AI identifies root causes, 
             assigns severity, and generates actionable remediation steps in seconds.
           </p>
@@ -70,7 +70,7 @@ export default function Landing() {
           </div>
         </div>
 
-        <div className="max-w-5xl w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="max-w-5xl w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 px-2">
           {[
             {
               icon: Search,
@@ -101,7 +101,7 @@ export default function Landing() {
           ))}
         </div>
 
-        <div className="mt-20 max-w-3xl w-full">
+        <div className="mt-12 md:mt-20 max-w-3xl w-full px-2">
           <Card className="p-1 bg-card/50 border-border/50 overflow-hidden">
             <div className="p-3 border-b border-border/50 flex items-center gap-2 bg-muted/20">
               <div className="flex gap-1.5">
