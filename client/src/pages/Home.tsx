@@ -1,164 +1,77 @@
-import { useState, useEffect } from "react";
-import Layout, { HISTORY_ITEMS } from "@/components/Layout";
+import { useState } from "react";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import type { Incident } from "@shared/schema";
 import { 
   Play, 
   Terminal, 
   AlertTriangle, 
-  CheckCircle2, 
   Copy, 
   Cpu, 
-  ArrowRight,
   Loader2,
-  FileText,
-  Code,
   Search,
   Activity,
   ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Types
-type AnalysisState = "idle" | "analyzing" | "complete";
-
-type AnalysisResult = {
-  rootCause: string;
-  confidence: number;
-  severity: "low" | "medium" | "high" | "critical";
-  evidence: string[];
-  fix: string;
-  nextSteps: string[];
-};
-
-// Mock results for history items
-const HISTORY_RESULTS: Record<string, AnalysisResult> = {
-  "inc-109": {
-    rootCause: "Redis Connection Timeout",
-    confidence: 98,
-    severity: "medium",
-    evidence: [
-      "Error: Redis connection to 127.0.0.1:6379 failed - connect ECONNREFUSED",
-      "at RedisClient.onError (node_modules/redis/index.js:12)"
-    ],
-    fix: "Check if Redis service is running. If running, verify the port binding in `redis.conf` matches the application config.",
-    nextSteps: [
-      "sudo systemctl status redis",
-      "Verify firewall rules for port 6379",
-      "Check application .env configuration"
-    ]
-  },
-  "inc-108": {
-    rootCause: "Payment Gateway 502 Bad Gateway",
-    confidence: 89,
-    severity: "critical",
-    evidence: [
-      "Upstream prematurely closed connection while reading response header from upstream",
-      "client: 10.0.0.5, server: api.payments.com, request: \"POST /v1/charge HTTP/1.1\""
-    ],
-    fix: "The upstream payment provider is experiencing downtime or high latency. Implement circuit breaker pattern.",
-    nextSteps: [
-      "Check status page of payment provider",
-      "Enable fallback payment route",
-      "Review Nginx proxy timeout settings"
-    ]
-  },
-  "inc-107": {
-    rootCause: "Memory Leak in Worker Process",
-    confidence: 92,
-    severity: "high",
-    evidence: [
-      "FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory",
-      "Last few GCs: ... 2048MB -> 2040MB"
-    ],
-    fix: "The worker process is consuming all available heap memory. Inspect `worker.ts` for unclosed streams or large object retention.",
-    nextSteps: [
-      "Increase --max-old-space-size as temporary fix",
-      "Run heap profile using `node --inspect`",
-      "Check for large file processing in memory"
-    ]
-  },
-  "inc-106": {
-    rootCause: "JWT Token Expiration",
-    confidence: 99,
-    severity: "medium",
-    evidence: [
-      "jwt expired at 2023-10-25T10:00:00.000Z",
-      "UnauthorizedError: No authorization token was found"
-    ],
-    fix: "The client's refresh token logic is failing to renew the access token before it expires.",
-    nextSteps: [
-      "Check client-side token refresh interceptor",
-      "Verify server time synchronization (NTP)",
-      "Ask user to re-login to clear stale state"
-    ]
-  }
-};
-
 export default function Home() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [logs, setLogs] = useState("");
-  const [status, setStatus] = useState<AnalysisState>("idle");
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [result, setResult] = useState<Incident | null>(null);
+
+  const analyzeMutation = useMutation({
+    mutationFn: async (logInput: string) => {
+      const res = await apiRequest("POST", "/api/incidents/analyze", { logs: logInput });
+      return res.json() as Promise<Incident>;
+    },
+    onSuccess: (data) => {
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Analysis failed", description: error.message, variant: "destructive" });
+    }
+  });
 
   const handleAnalyze = () => {
     if (!logs.trim()) return;
-    
-    setStatus("analyzing");
-    
-    // Simulate AI analysis delay
-    setTimeout(() => {
-      setResult({
-        rootCause: "Database Connection Pool Exhaustion",
-        confidence: 94,
-        severity: "high",
-        evidence: [
-          "TimeoutError: QueuePool limit of size 5 overflow 10 reached, connection timed out, timeout 30.00",
-          "at sqlalchemy.pool.impl.QueuePool._do_get (pool.py:134)"
-        ],
-        fix: "Increase the `pool_size` and `max_overflow` parameters in your SQLAlchemy configuration.",
-        nextSteps: [
-          "Update `database.py` configuration",
-          "Restart the application service",
-          "Monitor active connections in Grafana"
-        ]
-      });
-      setStatus("complete");
-    }, 2500);
+    analyzeMutation.mutate(logs);
   };
 
   const handleReset = () => {
     setLogs("");
-    setStatus("idle");
     setResult(null);
+    analyzeMutation.reset();
   };
 
-  const handleIncidentSelect = (id: string) => {
-    const historicalResult = HISTORY_RESULTS[id];
-    if (historicalResult) {
-      // Simulate loading a past incident
-      setLogs(`[${new Date().toISOString()}] Loading historical data for ${id}...\n[SYSTEM] Retrieving logs from archive...`);
-      setStatus("analyzing");
-      setTimeout(() => {
-        setLogs(`[LOG_DUMP_RESTORED] ${id}\n\n${historicalResult.evidence.join("\n")}\n... (full logs truncated)`);
-        setResult(historicalResult);
-        setStatus("complete");
-      }, 800);
+  const handleIncidentSelect = async (id: string) => {
+    try {
+      const res = await apiRequest("GET", `/api/incidents/${id}`);
+      const incident = await res.json() as Incident;
+      setLogs(incident.rawLogs);
+      setResult(incident);
+    } catch {
+      toast({ title: "Failed to load incident", variant: "destructive" });
     }
   };
 
   const copyToClipboard = () => {
     if (result?.fix) {
       navigator.clipboard.writeText(result.fix);
-      toast({
-        title: "Copied to clipboard",
-        description: "The fix command has been copied to your clipboard.",
-      });
+      toast({ title: "Copied to clipboard", description: "The fix has been copied." });
     }
   };
+
+  const isAnalyzing = analyzeMutation.isPending;
+  const isComplete = !!result;
 
   return (
     <Layout onIncidentSelect={handleIncidentSelect}>
@@ -172,7 +85,7 @@ export default function Home() {
               Paste logs below to identify root cause and generate fixes.
             </p>
           </div>
-          {status === "complete" && (
+          {isComplete && (
             <Button variant="outline" onClick={handleReset} className="font-mono text-xs border-primary/20 text-primary hover:bg-primary/10">
               <Terminal className="mr-2 h-3 w-3" />
               NEW SESSION
@@ -181,11 +94,7 @@ export default function Home() {
         </header>
 
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20">
-          
-          {/* Input Section */}
-          <div className={`transition-all duration-500 ease-in-out ${status === "complete" ? "lg:col-span-5" : "lg:col-span-12"}`}>
-            
-            {/* CLI Command Preview - Branding */}
+          <div className={`transition-all duration-500 ease-in-out ${isComplete ? "lg:col-span-5" : "lg:col-span-12"}`}>
             <div className="mb-4 font-mono text-xs text-muted-foreground flex items-center gap-2 px-1 opacity-70">
               <span className="text-green-500">$</span>
               <span>incident analyze</span>
@@ -210,22 +119,24 @@ export default function Home() {
               
               <div className="flex-1 relative">
                 <Textarea 
+                  data-testid="input-logs"
                   value={logs}
                   onChange={(e) => setLogs(e.target.value)}
                   placeholder="Paste stack traces, error logs, or terminal output here..."
                   className="w-full h-full resize-none bg-transparent border-0 rounded-none p-4 font-mono text-sm leading-relaxed focus-visible:ring-0 text-muted-foreground focus:text-foreground selection:bg-primary/20 placeholder:text-muted-foreground/30"
                   spellCheck={false}
-                  disabled={status === "analyzing"}
+                  disabled={isAnalyzing}
                 />
               </div>
 
               <div className="p-4 border-t border-border bg-muted/10">
                 <Button 
+                  data-testid="button-analyze"
                   onClick={handleAnalyze} 
-                  disabled={!logs.trim() || status !== "idle"}
+                  disabled={!logs.trim() || isAnalyzing || isComplete}
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold tracking-wide h-12 shadow-[0_0_20px_-5px_hsl(var(--primary))]"
                 >
-                  {status === "analyzing" ? (
+                  {isAnalyzing ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ANALYZING PATTERNS...
@@ -241,9 +152,8 @@ export default function Home() {
             </Card>
           </div>
 
-          {/* Results Section */}
           <AnimatePresence>
-            {status === "complete" && result && (
+            {isComplete && result && (
               <motion.div 
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -251,16 +161,15 @@ export default function Home() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="lg:col-span-7 flex flex-col gap-4 overflow-y-auto pr-1"
               >
-                {/* Summary Card */}
                 <Card className="p-6 border-l-4 border-l-red-500 bg-gradient-to-br from-card to-card/50 shadow-lg relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
                     <AlertTriangle className="h-24 w-24 text-red-500" />
                   </div>
                   <div className="flex justify-between items-start mb-4 relative z-10">
                     <div>
-                      <h2 className="text-xl font-bold font-sans text-foreground flex items-center gap-2">
+                      <h2 data-testid="text-root-cause" className="text-xl font-bold font-sans text-foreground flex items-center gap-2">
                         <AlertTriangle className="text-red-500 h-5 w-5" />
-                        {result.rootCause}
+                        {result.rootCause.length > 80 ? result.title : result.rootCause}
                       </h2>
                       <div className="flex gap-2 mt-3">
                         <Badge variant="destructive" className="uppercase text-[10px] tracking-wider bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30">
@@ -272,9 +181,11 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
+                  {result.rootCause.length > 80 && (
+                    <p className="text-sm text-muted-foreground mt-2 relative z-10">{result.rootCause}</p>
+                  )}
                 </Card>
 
-                {/* Evidence Card */}
                 <Card className="p-0 overflow-hidden border-border bg-card/50 backdrop-blur-sm">
                   <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center gap-2">
                     <Search className="h-3 w-3 text-muted-foreground" />
@@ -289,7 +200,6 @@ export default function Home() {
                   </div>
                 </Card>
 
-                {/* Solution Card */}
                 <Card className="p-6 border-border bg-gradient-to-br from-card to-emerald-950/20 border-l-4 border-l-emerald-500">
                   <div className="flex items-center gap-2 mb-4 text-emerald-500">
                     <Cpu className="h-5 w-5" />
@@ -300,6 +210,7 @@ export default function Home() {
                       {result.fix}
                     </code>
                     <Button 
+                      data-testid="button-copy-fix"
                       onClick={copyToClipboard}
                       variant="ghost" 
                       size="icon" 
@@ -310,7 +221,6 @@ export default function Home() {
                   </div>
                 </Card>
 
-                {/* Action Plan */}
                 <div className="grid grid-cols-1 gap-3">
                   <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-2 mt-2">
                     <Activity className="h-4 w-4" /> Recommended Actions

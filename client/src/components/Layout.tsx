@@ -1,25 +1,16 @@
-import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Activity, 
   Terminal, 
   Clock, 
-  ShieldAlert, 
   Settings, 
-  LogOut, 
   Command,
-  Search,
-  ChevronRight
+  Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Mock Data for History
-export const HISTORY_ITEMS = [
-  { id: "inc-109", title: "Redis Connection Timeout", status: "resolved", time: "2h ago", type: "db" },
-  { id: "inc-108", title: "Payment Gateway 502", status: "critical", time: "5h ago", type: "api" },
-  { id: "inc-107", title: "Memory Leak in Worker", status: "resolved", time: "1d ago", type: "system" },
-  { id: "inc-106", title: "Auth Token Expiry", status: "resolved", time: "2d ago", type: "auth" },
-];
+import type { Incident } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,9 +20,15 @@ interface LayoutProps {
 export default function Layout({ children, onIncidentSelect }: LayoutProps) {
   const [location] = useLocation();
 
+  const { data: incidents = [] } = useQuery<Incident[]>({
+    queryKey: ["/api/incidents"],
+    refetchInterval: 10000,
+  });
+
+  const recentIncidents = incidents.slice(0, 6);
+
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans text-foreground">
-      {/* Sidebar */}
       <aside className="w-64 border-r border-border bg-card/50 backdrop-blur-sm flex flex-col">
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-2 text-primary">
@@ -72,22 +69,26 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
             <Search className="h-3 w-3 cursor-pointer hover:text-foreground" />
           </div>
           <div className="space-y-1 px-2">
-            {HISTORY_ITEMS.map((item) => (
+            {recentIncidents.length === 0 && (
+              <p className="text-xs text-muted-foreground px-3 py-4 text-center">No incidents yet. Analyze some logs to get started.</p>
+            )}
+            {recentIncidents.map((item) => (
               <div 
                 key={item.id} 
                 onClick={() => onIncidentSelect?.(item.id)}
                 className="group flex flex-col gap-1 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors border border-transparent hover:border-border/50"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-primary/80">{item.id}</span>
+                  <span className="text-xs font-mono text-primary/80">{item.id.slice(0, 8)}</span>
                   <span className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    item.status === "critical" ? "bg-red-500 animate-pulse" : "bg-emerald-500"
+                    item.severity === "critical" ? "bg-red-500 animate-pulse" : 
+                    item.severity === "high" ? "bg-amber-500" : "bg-emerald-500"
                   )} />
                 </div>
                 <span className="text-sm font-medium truncate">{item.title}</span>
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> {item.time}
+                  <Clock className="h-3 w-3" /> {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                 </span>
               </div>
             ))}
@@ -108,11 +109,9 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
         <div className="absolute inset-0 bg-radial-[circle_800px_at_50%_-20%] from-primary/5 via-transparent to-transparent pointer-events-none" />
-        
         {children}
       </main>
     </div>

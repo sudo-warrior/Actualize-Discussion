@@ -18,7 +18,7 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async createIncident(incident: InsertIncident): Promise<Incident> {
-    const [created] = await db.insert(incidents).values(incident).returning();
+    const [created] = await db.insert(incidents).values(incident as any).returning();
     return created;
   }
 

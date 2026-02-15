@@ -2,6 +2,9 @@ import { Card } from "@/components/ui/card";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import type { Incident } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 import { 
   Area, 
   AreaChart, 
@@ -10,8 +13,6 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid,
-  BarChart,
-  Bar,
   Legend
 } from "recharts";
 import { 
@@ -22,13 +23,10 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   Server,
-  Database,
-  Globe,
-  Shield,
-  Zap
+  Zap,
+  Settings
 } from "lucide-react";
 
-// Mock Data
 const VOLUME_DATA = [
   { time: "00:00", incidents: 2, auto_resolved: 1 },
   { time: "04:00", incidents: 1, auto_resolved: 1 },
@@ -37,13 +35,6 @@ const VOLUME_DATA = [
   { time: "16:00", incidents: 9, auto_resolved: 6 },
   { time: "20:00", incidents: 4, auto_resolved: 3 },
   { time: "24:00", incidents: 3, auto_resolved: 2 },
-];
-
-const SEVERITY_DATA = [
-  { name: "Critical", count: 12, fill: "hsl(0 62.8% 30.6%)" },
-  { name: "High", count: 24, fill: "hsl(30 80% 55%)" },
-  { name: "Medium", count: 45, fill: "hsl(220 70% 50%)" },
-  { name: "Low", count: 86, fill: "hsl(160 60% 45%)" },
 ];
 
 const SYSTEM_STATUS = [
@@ -55,6 +46,18 @@ const SYSTEM_STATUS = [
 ];
 
 export default function Dashboard() {
+  const { data: incidents = [] } = useQuery<Incident[]>({
+    queryKey: ["/api/incidents"],
+    refetchInterval: 10000,
+  });
+
+  const totalIncidents = incidents.length;
+  const criticalCount = incidents.filter(i => i.severity === "critical").length;
+  const highCount = incidents.filter(i => i.severity === "high").length;
+  const avgConfidence = totalIncidents > 0 
+    ? Math.round(incidents.reduce((sum, i) => sum + i.confidence, 0) / totalIncidents) 
+    : 0;
+
   return (
     <Layout>
       <div className="flex-1 overflow-y-auto p-8 relative z-10">
@@ -75,13 +78,12 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Key Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Active Incidents", value: "3", change: "-2", trend: "down", icon: AlertTriangle, color: "text-red-500" },
-            { label: "Mean Time to Resolve", value: "14m", change: "-12%", trend: "down", icon: Clock, color: "text-blue-500" },
-            { label: "Auto-Resolution Rate", value: "64%", change: "+5%", trend: "up", icon: Zap, color: "text-amber-500" },
-            { label: "System Uptime", value: "99.92%", change: "+0.01%", trend: "up", icon: Activity, color: "text-emerald-500" },
+            { label: "Total Incidents", value: String(totalIncidents), change: totalIncidents > 0 ? `${totalIncidents} total` : "none", trend: "up" as const, icon: AlertTriangle, color: "text-red-500" },
+            { label: "Critical Issues", value: String(criticalCount), change: criticalCount > 0 ? "needs attention" : "all clear", trend: criticalCount > 0 ? "up" as const : "down" as const, icon: Clock, color: "text-blue-500" },
+            { label: "Avg. Confidence", value: avgConfidence > 0 ? `${avgConfidence}%` : "—", change: avgConfidence >= 85 ? "high accuracy" : "building data", trend: "up" as const, icon: Zap, color: "text-amber-500" },
+            { label: "System Uptime", value: "99.92%", change: "+0.01%", trend: "up" as const, icon: Activity, color: "text-emerald-500" },
           ].map((stat, i) => (
             <Card key={i} className="p-4 bg-card/50 backdrop-blur-sm border-border hover:border-primary/30 transition-colors">
               <div className="flex justify-between items-start mb-2">
@@ -100,7 +102,6 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Main Chart */}
           <Card className="lg:col-span-2 p-6 bg-card/50 border-border">
             <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider mb-6 flex items-center gap-2">
               <Activity className="h-4 w-4" /> Incident Volume (24h)
@@ -119,19 +120,8 @@ export default function Dashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis 
-                    dataKey="time" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false}
-                  />
+                  <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: "hsl(var(--card))", 
@@ -142,30 +132,13 @@ export default function Dashboard() {
                     itemStyle={{ color: "hsl(var(--foreground))" }}
                   />
                   <Legend />
-                  <Area 
-                    type="monotone" 
-                    dataKey="incidents" 
-                    name="Total Incidents"
-                    stroke="hsl(220 70% 50%)" 
-                    fillOpacity={1} 
-                    fill="url(#colorIncidents)" 
-                    strokeWidth={2}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="auto_resolved" 
-                    name="Auto-Resolved"
-                    stroke="hsl(160 60% 45%)" 
-                    fillOpacity={1} 
-                    fill="url(#colorResolved)" 
-                    strokeWidth={2}
-                  />
+                  <Area type="monotone" dataKey="incidents" name="Total Incidents" stroke="hsl(220 70% 50%)" fillOpacity={1} fill="url(#colorIncidents)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="auto_resolved" name="Auto-Resolved" stroke="hsl(160 60% 45%)" fillOpacity={1} fill="url(#colorResolved)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
-          {/* Service Health List */}
           <Card className="p-0 bg-card/50 border-border overflow-hidden">
             <div className="p-4 border-b border-border bg-muted/20">
               <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-2">
@@ -182,57 +155,56 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground font-mono">{service.latency}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="outline" className={`font-mono text-[10px] ${service.status === 'operational' ? 'text-emerald-500 border-emerald-500/20' : 'text-amber-500 border-amber-500/20'}`}>
-                      {service.uptime}
-                    </Badge>
-                  </div>
+                  <Badge variant="outline" className={`font-mono text-[10px] ${service.status === 'operational' ? 'text-emerald-500 border-emerald-500/20' : 'text-amber-500 border-amber-500/20'}`}>
+                    {service.uptime}
+                  </Badge>
                 </div>
               ))}
-            </div>
-            <div className="p-3 bg-muted/10 text-center border-t border-border">
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary w-full h-8">
-                View All Services
-              </Button>
             </div>
           </Card>
         </div>
 
-        {/* Recent Activity Feed */}
+        {/* Recent Incidents from DB */}
         <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Clock className="h-4 w-4" /> Activity Feed
+          <Clock className="h-4 w-4" /> Recent Analyses
         </h3>
         <Card className="bg-card/50 border-border overflow-hidden">
-          <div className="divide-y divide-border">
-            {[
-              { action: "Incident Resolved", target: "Redis Connection Timeout", user: "Operator_01", time: "10m ago", icon: CheckCircle2, color: "text-emerald-500" },
-              { action: "New Alert", target: "High CPU Usage (Worker Node 4)", user: "System", time: "25m ago", icon: AlertTriangle, color: "text-red-500" },
-              { action: "Configuration Change", target: "Updated retention policy", user: "DevOps_Lead", time: "1h ago", icon: Settings, color: "text-blue-500" },
-              { action: "Deployment", target: "v2.4.0 (Hotfix)", user: "CI/CD Pipeline", time: "2h ago", icon: Zap, color: "text-purple-500" },
-            ].map((item, i) => (
-              <div key={i} className="p-4 flex items-center gap-4 hover:bg-muted/10 transition-colors">
-                <div className={`p-2 rounded-full bg-muted/50 ${item.color}`}>
-                  <item.icon className="h-4 w-4" />
+          {incidents.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-sm">
+              No incidents analyzed yet. Go to <span className="text-primary">New Analysis</span> to get started.
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {incidents.slice(0, 8).map((incident) => (
+                <div key={incident.id} className="p-4 flex items-center gap-4 hover:bg-muted/10 transition-colors">
+                  <div className={`p-2 rounded-full bg-muted/50 ${
+                    incident.severity === "critical" ? "text-red-500" : 
+                    incident.severity === "high" ? "text-amber-500" : 
+                    incident.severity === "medium" ? "text-blue-500" : "text-emerald-500"
+                  }`}>
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {incident.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                      {incident.severity.toUpperCase()} • {incident.confidence}% confidence • {formatDistanceToNow(new Date(incident.createdAt), { addSuffix: true })}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className={`text-[10px] font-mono ${
+                    incident.severity === "critical" ? "text-red-500 border-red-500/20" : 
+                    incident.severity === "high" ? "text-amber-500 border-amber-500/20" : 
+                    "text-blue-500 border-blue-500/20"
+                  }`}>
+                    {incident.severity}
+                  </Badge>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    <span className={item.color}>{item.action}</span>: {item.target}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                    by {item.user} • {item.time}
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 h-8 w-8 p-0">
-                  <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </Layout>
   );
 }
-
-// Temporary icon import for mocked data
-import { Settings } from "lucide-react";
