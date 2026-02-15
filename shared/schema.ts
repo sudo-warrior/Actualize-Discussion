@@ -1,10 +1,14 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export * from "./models/auth";
+export * from "./models/chat";
+
 export const incidents = pgTable("incidents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
   title: text("title").notNull(),
   severity: text("severity").notNull().$type<"low" | "medium" | "high" | "critical">(),
   status: text("status").notNull().$type<"analyzing" | "resolved" | "critical">().default("analyzing"),

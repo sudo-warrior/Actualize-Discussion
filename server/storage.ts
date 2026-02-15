@@ -1,18 +1,12 @@
 import { type Incident, type InsertIncident, incidents } from "@shared/schema";
-import { desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const db = drizzle(pool);
+import { desc, eq, and } from "drizzle-orm";
+import { db } from "./db";
 
 export interface IStorage {
   createIncident(incident: InsertIncident): Promise<Incident>;
   getIncident(id: string): Promise<Incident | undefined>;
   getAllIncidents(): Promise<Incident[]>;
+  getIncidentsByUser(userId: string): Promise<Incident[]>;
   updateIncidentStatus(id: string, status: Incident["status"]): Promise<Incident | undefined>;
 }
 
@@ -29,6 +23,10 @@ export class DatabaseStorage implements IStorage {
 
   async getAllIncidents(): Promise<Incident[]> {
     return db.select().from(incidents).orderBy(desc(incidents.createdAt));
+  }
+
+  async getIncidentsByUser(userId: string): Promise<Incident[]> {
+    return db.select().from(incidents).where(eq(incidents.userId, userId)).orderBy(desc(incidents.createdAt));
   }
 
   async updateIncidentStatus(id: string, status: Incident["status"]): Promise<Incident | undefined> {
