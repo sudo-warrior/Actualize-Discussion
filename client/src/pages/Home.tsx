@@ -21,7 +21,10 @@ import {
   Activity,
   Check,
   ExternalLink,
-  CheckCircle2
+  Sparkles,
+  X,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -31,6 +34,9 @@ export default function Home() {
   const [, navigate] = useLocation();
   const [logs, setLogs] = useState("");
   const [result, setResult] = useState<Incident | null>(null);
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+  const [guidanceData, setGuidanceData] = useState<Record<number, string>>({});
+  const [loadingGuidance, setLoadingGuidance] = useState<number | null>(null);
 
   const analyzeMutation = useMutation({
     mutationFn: async (logInput: string) => {
@@ -59,6 +65,8 @@ export default function Home() {
   const handleReset = () => {
     setLogs("");
     setResult(null);
+    setExpandedStep(null);
+    setGuidanceData({});
     analyzeMutation.reset();
   };
 
@@ -95,6 +103,26 @@ export default function Home() {
   const handleStepToggle = (stepIndex: number) => {
     if (!result) return;
     toggleStepMutation.mutate({ incidentId: result.id, stepIndex });
+  };
+
+  const handleGetGuidance = async (stepIndex: number) => {
+    if (!result) return;
+    if (guidanceData[stepIndex]) {
+      setExpandedStep(expandedStep === stepIndex ? null : stepIndex);
+      return;
+    }
+    setExpandedStep(stepIndex);
+    setLoadingGuidance(stepIndex);
+    try {
+      const res = await apiRequest("POST", `/api/incidents/${result.id}/steps/${stepIndex}/guidance`);
+      const data = await res.json();
+      setGuidanceData(prev => ({ ...prev, [stepIndex]: data.guidance }));
+    } catch {
+      toast({ title: "Failed to get guidance", description: "Please try again.", variant: "destructive" });
+      setExpandedStep(null);
+    } finally {
+      setLoadingGuidance(null);
+    }
   };
 
   const copyStepToClipboard = (step: string) => {
@@ -200,10 +228,18 @@ export default function Home() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="lg:col-span-7 flex flex-col gap-4 overflow-y-auto pr-1"
               >
-                <Card className="p-6 border-l-4 border-l-red-500 bg-gradient-to-br from-card to-card/50 shadow-lg relative overflow-hidden">
+                <Card className="p-6 border-l-4 border-l-red-500 bg-gradient-to-br from-card to-card/50 shadow-lg relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
                     <AlertTriangle className="h-24 w-24 text-red-500" />
                   </div>
+                  <button
+                    data-testid="button-copy-root-cause"
+                    onClick={() => { navigator.clipboard.writeText(result.rootCause); toast({ title: "Copied", description: "Root cause copied." }); }}
+                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground h-7 w-7 rounded flex items-center justify-center hover:bg-muted z-20"
+                    title="Copy root cause"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
                   <div className="flex justify-between items-start mb-4 relative z-10">
                     <div>
                       <h2 data-testid="text-root-cause" className="text-xl font-bold font-sans text-foreground flex items-center gap-2">
@@ -225,15 +261,29 @@ export default function Home() {
                   )}
                 </Card>
 
-                <Card className="p-0 overflow-hidden border-border bg-card/50 backdrop-blur-sm">
+                <Card className="p-0 overflow-hidden border-border bg-card/50 backdrop-blur-sm relative group">
                   <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center gap-2">
                     <Search className="h-3 w-3 text-muted-foreground" />
                     <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Key Evidence</span>
+                    <button
+                      data-testid="button-copy-evidence"
+                      onClick={() => { navigator.clipboard.writeText(result.evidence.join("\n")); toast({ title: "Copied", description: "All evidence copied." }); }}
+                      className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
+                      title="Copy all evidence"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
                   </div>
                   <div className="p-4 space-y-2 bg-black/40 font-mono text-xs">
                     {result.evidence.map((line, i) => (
-                      <div key={i} className="text-red-300/90 border-l-2 border-red-500/50 pl-3 py-1 break-all">
+                      <div key={i} className="text-red-300/90 border-l-2 border-red-500/50 pl-3 py-1 break-all group/line relative">
                         {line}
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(line); toast({ title: "Copied", description: "Evidence line copied." }); }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/line:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -271,33 +321,97 @@ export default function Home() {
                   </div>
                   {result.nextSteps.map((step, i) => {
                     const isDone = (result.completedSteps || []).includes(i);
+                    const isExpanded = expandedStep === i;
+                    const hasGuidance = !!guidanceData[i];
+                    const isLoadingThis = loadingGuidance === i;
+
                     return (
-                      <motion.div 
-                        key={i}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 + 0.3 }}
-                        className={`bg-card border p-4 rounded-lg flex items-center gap-3 transition-all group ${isDone ? "border-emerald-500/30 bg-emerald-500/5" : "border-border hover:border-primary/50 hover:bg-accent/5"}`}
-                      >
-                        <button
-                          data-testid={`button-toggle-step-${i}`}
-                          onClick={() => handleStepToggle(i)}
-                          className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-colors border ${isDone ? "bg-emerald-500 border-emerald-500 text-white" : "bg-muted border-border hover:border-primary hover:bg-primary/20"}`}
+                      <div key={i}>
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.1 + 0.3 }}
+                          className={`bg-card border rounded-lg transition-all ${isDone ? "border-emerald-500/30 bg-emerald-500/5" : isExpanded ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/5"}`}
                         >
-                          {isDone ? <Check className="h-3 w-3" /> : <span className="text-xs font-mono">{i + 1}</span>}
-                        </button>
-                        <span className={`text-sm font-medium flex-1 ${isDone ? "line-through text-muted-foreground" : ""}`}>{step}</span>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            data-testid={`button-copy-step-${i}`}
-                            onClick={(e) => { e.stopPropagation(); copyStepToClipboard(step); }}
-                            className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                            title="Copy action"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </motion.div>
+                          <div className="p-4 flex items-center gap-3 group">
+                            <button
+                              data-testid={`button-toggle-step-${i}`}
+                              onClick={() => handleStepToggle(i)}
+                              className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-colors border ${isDone ? "bg-emerald-500 border-emerald-500 text-white" : "bg-muted border-border hover:border-primary hover:bg-primary/20"}`}
+                            >
+                              {isDone ? <Check className="h-3 w-3" /> : <span className="text-xs font-mono">{i + 1}</span>}
+                            </button>
+                            <span className={`text-sm font-medium flex-1 ${isDone ? "line-through text-muted-foreground" : ""}`}>{step}</span>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                data-testid={`button-copy-step-${i}`}
+                                onClick={(e) => { e.stopPropagation(); copyStepToClipboard(step); }}
+                                className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                title="Copy action"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="px-4 pb-3">
+                            <button
+                              data-testid={`button-guidance-${i}`}
+                              onClick={() => handleGetGuidance(i)}
+                              className="flex items-center gap-1.5 text-[10px] font-mono text-primary hover:text-primary/80 transition-colors px-2 py-1 rounded hover:bg-primary/10"
+                            >
+                              {isLoadingThis ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-3 w-3" />
+                              )}
+                              {isLoadingThis ? "Getting help..." : hasGuidance && isExpanded ? "Hide guidance" : "How do I do this?"}
+                              {hasGuidance && !isLoadingThis && (isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                            </button>
+                          </div>
+                        </motion.div>
+
+                        <AnimatePresence>
+                          {isExpanded && (hasGuidance || isLoadingThis) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-1 p-4 bg-primary/5 border border-primary/20 rounded-lg relative">
+                                <div className="flex items-center gap-2 mb-3 text-primary">
+                                  <Sparkles className="h-4 w-4" />
+                                  <span className="text-xs font-mono uppercase tracking-wider">AI Guidance</span>
+                                  <button
+                                    onClick={() => { if (guidanceData[i]) copyStepToClipboard(guidanceData[i]); }}
+                                    className="ml-auto text-muted-foreground hover:text-foreground h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
+                                    title="Copy guidance"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => setExpandedStep(null)}
+                                    className="text-muted-foreground hover:text-foreground h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                                {isLoadingThis ? (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-4 justify-center">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Generating step-by-step instructions...</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-foreground leading-relaxed whitespace-pre-wrap font-mono max-h-[400px] overflow-y-auto">
+                                    {guidanceData[i]}
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     );
                   })}
                   {result.nextSteps.length > 0 && (

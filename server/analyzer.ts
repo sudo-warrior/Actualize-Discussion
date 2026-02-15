@@ -94,6 +94,41 @@ export async function analyzeLogs(rawLogs: string): Promise<AnalysisResult> {
   }
 }
 
+export async function getStepGuidance(step: string, context: { rootCause: string; fix: string; rawLogs: string }): Promise<string> {
+  const guidancePrompt = `You are an expert SRE helping an engineer complete a remediation step for an incident.
+
+The incident context:
+- Root cause: ${context.rootCause}
+- Suggested fix: ${context.fix}
+
+The engineer needs help with this specific action step:
+"${step}"
+
+Provide a clear, detailed, step-by-step guide on how to complete this action. Include:
+1. Exact commands to run (if applicable)
+2. Configuration changes to make (with file paths and values)
+3. How to verify the step was completed successfully
+4. Any warnings or gotchas to watch out for
+
+Keep it practical and actionable. Use markdown formatting for readability. Do NOT include the original log content.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        { role: "user", parts: [{ text: guidancePrompt }] }
+      ],
+      config: {
+        maxOutputTokens: 4096,
+      },
+    });
+    return response.text || "Unable to generate guidance. Please try again.";
+  } catch (error) {
+    console.error("Guidance generation error:", error);
+    return "AI guidance is temporarily unavailable. Please try again later.";
+  }
+}
+
 function fallbackAnalysis(rawLogs: string): AnalysisResult {
   const lines = rawLogs.split("\n").filter(l => l.trim());
   const errorLines = lines.filter(line => /error|fatal|fail|exception|panic|crash/i.test(line)).slice(0, 5);

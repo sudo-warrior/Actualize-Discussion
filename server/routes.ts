@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeLogsSchema } from "@shared/schema";
-import { analyzeLogs } from "./analyzer";
+import { analyzeLogs, getStepGuidance } from "./analyzer";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 export async function registerRoutes(
@@ -103,6 +103,35 @@ export async function registerRoutes(
     }
     const updated = await storage.toggleStepCompletion(req.params.id as string, stepIndex);
     return res.json(updated);
+  });
+
+  app.post("/api/incidents/:id/steps/:stepIndex/guidance", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const incident = await storage.getIncident(req.params.id as string);
+    if (!incident) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    if (incident.userId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const stepIndex = parseInt(req.params.stepIndex, 10);
+    if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= incident.nextSteps.length) {
+      return res.status(400).json({ message: "Invalid step index" });
+    }
+    try {
+      const guidance = await getStepGuidance(incident.nextSteps[stepIndex], {
+        rootCause: incident.rootCause,
+        fix: incident.fix,
+        rawLogs: incident.rawLogs.slice(0, 2000),
+      });
+      return res.json({ guidance });
+    } catch (error) {
+      console.error("Guidance error:", error);
+      return res.status(500).json({ message: "Failed to generate guidance." });
+    }
   });
 
   app.delete("/api/incidents/:id", isAuthenticated, async (req: any, res) => {
