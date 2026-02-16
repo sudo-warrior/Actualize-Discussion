@@ -1,12 +1,15 @@
+import { useState } from "react";
 import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Incident } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import {
   User,
   Mail,
@@ -18,16 +21,70 @@ import {
   Zap,
   LogOut,
   ChevronRight,
-  BarChart3
+  BarChart3,
+  Key,
+  Plus,
+  Trash2,
+  Copy,
+  Check,
+  Eye,
+  EyeOff
 } from "lucide-react";
+
+interface ApiKeyInfo {
+  id: string;
+  name: string;
+  key?: string;
+  keyPrefix: string;
+  revoked: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
 
   const { data: incidents = [] } = useQuery<Incident[]>({
     queryKey: ["/api/incidents"],
   });
+
+  const { data: apiKeys = [] } = useQuery<ApiKeyInfo[]>({
+    queryKey: ["/api/keys"],
+  });
+
+  const createKeyMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/keys", { name });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setNewlyCreatedKey(data.key);
+      setNewKeyName("");
+      queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
+    },
+  });
+
+  const revokeKeyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/keys/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
+    },
+  });
+
+  const handleCopyKey = () => {
+    if (newlyCreatedKey) {
+      navigator.clipboard.writeText(newlyCreatedKey);
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2000);
+    }
+  };
 
   const totalIncidents = incidents.length;
   const criticalCount = incidents.filter(i => i.severity === "critical").length;
@@ -167,6 +224,82 @@ export default function Profile() {
                   </div>
                 </div>
               </div>
+            </Card>
+
+            <Card className="p-5 bg-card/50 border-border border-l-4 border-l-primary/40">
+              <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Key className="h-4 w-4" /> API Keys
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Generate API keys to access the developer API programmatically. <span data-testid="link-api-docs" className="text-primary cursor-pointer hover:underline" onClick={() => navigate("/docs")}>View API docs</span>
+              </p>
+
+              {newlyCreatedKey && (
+                <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30">
+                  <p className="text-xs text-emerald-400 font-mono mb-2">Key created! Copy it now — you won't see it again.</p>
+                  <div className="flex items-center gap-2">
+                    <code data-testid="text-new-api-key" className="flex-1 text-xs font-mono bg-background/50 p-2 rounded border border-border truncate select-all">{newlyCreatedKey}</code>
+                    <Button data-testid="button-copy-api-key" variant="ghost" size="icon" onClick={handleCopyKey} className="shrink-0 h-8 w-8">
+                      {copiedKey ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 mb-4">
+                <Input
+                  data-testid="input-api-key-name"
+                  placeholder="Key name (e.g. CI/CD Pipeline)"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  className="text-xs font-mono bg-card/50 border-border"
+                  onKeyDown={(e) => { if (e.key === "Enter" && newKeyName.trim()) createKeyMutation.mutate(newKeyName.trim()); }}
+                />
+                <Button
+                  data-testid="button-create-api-key"
+                  variant="outline"
+                  size="sm"
+                  disabled={!newKeyName.trim() || createKeyMutation.isPending}
+                  onClick={() => createKeyMutation.mutate(newKeyName.trim())}
+                  className="shrink-0 font-mono text-xs border-primary/20 text-primary hover:bg-primary/10"
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Create
+                </Button>
+              </div>
+
+              {apiKeys.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-3">No API keys yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {apiKeys.map((k) => (
+                    <div key={k.id} data-testid={`row-api-key-${k.id}`} className="flex items-center gap-3 p-2 rounded-md bg-muted/10 border border-border/50">
+                      <Key className={`h-3.5 w-3.5 shrink-0 ${k.revoked ? "text-muted-foreground" : "text-primary"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium truncate ${k.revoked ? "line-through text-muted-foreground" : ""}`}>{k.name}</span>
+                          {k.revoked && <Badge variant="outline" className="text-[9px] text-red-400 border-red-400/20">revoked</Badge>}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-mono">
+                          {k.keyPrefix}... · {formatDistanceToNow(new Date(k.createdAt), { addSuffix: true })}
+                          {k.lastUsedAt && ` · last used ${formatDistanceToNow(new Date(k.lastUsedAt), { addSuffix: true })}`}
+                        </p>
+                      </div>
+                      {!k.revoked && (
+                        <Button
+                          data-testid={`button-revoke-key-${k.id}`}
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => revokeKeyMutation.mutate(k.id)}
+                          disabled={revokeKeyMutation.isPending}
+                          className="h-7 w-7 text-muted-foreground hover:text-red-400"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             <Card className="p-5 bg-card/50 border-border">
