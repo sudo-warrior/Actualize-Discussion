@@ -37,13 +37,22 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
   const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
 
   const { data: incidents = [] } = useQuery<Incident[]>({
     queryKey: ["/api/incidents"],
     refetchInterval: 10000,
   });
 
-  const recentIncidents = incidents.slice(0, 6);
+  const filteredIncidents = searchQuery
+    ? incidents.filter(i => 
+        i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.rawLogs.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : incidents;
+
+  const recentIncidents = filteredIncidents.slice(0, 6);
 
   const handleNavClick = () => setMobileOpen(false);
 
@@ -115,8 +124,23 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
 
         <div className="px-4 mb-2 text-xs font-mono text-muted-foreground uppercase tracking-wider flex items-center justify-between">
           <span>Recent Incidents</span>
-          <Search className="h-3 w-3 cursor-pointer hover:text-foreground" />
+          <Search 
+            className="h-3 w-3 cursor-pointer hover:text-foreground transition-colors" 
+            onClick={() => setShowSearch(!showSearch)}
+          />
         </div>
+        {showSearch && (
+          <div className="px-4 mb-2">
+            <input
+              type="text"
+              placeholder="Search incidents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:border-primary font-mono"
+              autoFocus
+            />
+          </div>
+        )}
         <div className="space-y-1 px-2">
           {recentIncidents.length === 0 && (
             <p className="text-xs text-muted-foreground px-3 py-4 text-center">No incidents yet. Analyze some logs to get started.</p>
