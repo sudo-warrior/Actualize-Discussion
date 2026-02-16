@@ -1,9 +1,38 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { createHash, randomBytes } from "crypto";
 import { storage } from "./storage";
 import { analyzeLogsSchema } from "@shared/schema";
 import { analyzeLogs, getStepGuidance } from "./analyzer";
 import { isAuthenticated } from "./auth";
+
+function hashApiKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
+
+async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
+  const header = req.headers["authorization"] || req.headers["x-api-key"];
+  let token: string | undefined;
+
+  if (typeof header === "string") {
+    token = header.startsWith("Bearer ") ? header.slice(7) : header;
+  }
+
+  if (!token) {
+    return res.status(401).json({ error: "Missing API key. Include it as Authorization: Bearer <key> or X-API-Key header." });
+  }
+
+  const keyHash = hashApiKey(token);
+  const apiKey = await storage.findApiKeyByHash(keyHash);
+  if (!apiKey) {
+    return res.status(401).json({ error: "Invalid or revoked API key." });
+  }
+
+  storage.updateApiKeyLastUsed(apiKey.id).catch(() => {});
+
+  req.apiUserId = apiKey.userId;
+  next();
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -17,7 +46,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: parsed.error.errors[0].message });
       }
 
-      const userId = req.user?.id;
+      const userId = req.user.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -46,7 +75,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/incidents", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -59,7 +88,7 @@ export async function registerRoutes(
     if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
     }
-    const userId = req.user?.id;
+    const userId = req.user.id;
     if (incident.userId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -71,7 +100,7 @@ export async function registerRoutes(
     if (!["analyzing", "resolved", "critical"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const incident = await storage.getIncident(req.params.id as string);
     if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
@@ -84,7 +113,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/incidents/:id/steps/:stepIndex", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -104,7 +133,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/incidents/:id/steps/:stepIndex/guidance", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -133,7 +162,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/incidents/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -149,7 +178,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/incidents/stats/summary", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -200,6 +229,121 @@ export async function registerRoutes(
       volumeData,
       recentIncidents: incidents.slice(0, 10),
     });
+  });
+
+  // === API Key Management (session-protected) ===
+
+  app.post("/api/keys", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const { name } = req.body;
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return res.status(400).json({ message: "API key name is required." });
+    }
+
+    const rawKey = `ic_${randomBytes(32).toString("hex")}`;
+    const keyHash = hashApiKey(rawKey);
+    const keyPrefix = rawKey.slice(0, 10);
+
+    const apiKey = await storage.createApiKey({
+      userId,
+      name: name.trim(),
+      keyHash,
+      keyPrefix,
+      revoked: false,
+    });
+
+    return res.status(201).json({
+      id: apiKey.id,
+      name: apiKey.name,
+      key: rawKey,
+      keyPrefix: apiKey.keyPrefix,
+      createdAt: apiKey.createdAt,
+    });
+  });
+
+  app.get("/api/keys", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const keys = await storage.getApiKeysByUser(userId);
+    return res.json(keys.map(k => ({
+      id: k.id,
+      name: k.name,
+      keyPrefix: k.keyPrefix,
+      revoked: k.revoked,
+      lastUsedAt: k.lastUsedAt,
+      createdAt: k.createdAt,
+    })));
+  });
+
+  app.delete("/api/keys/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const revoked = await storage.revokeApiKey(userId, req.params.id as string);
+    if (!revoked) return res.status(404).json({ message: "API key not found." });
+    return res.json({ success: true });
+  });
+
+  // === Developer API v1 (API key auth) ===
+
+  app.post("/api/v1/incidents/analyze", apiKeyAuth, async (req: any, res) => {
+    try {
+      const parsed = analyzeLogsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0].message });
+      }
+      const { logs } = parsed.data;
+      const analysis = await analyzeLogs(logs);
+      const incident = await storage.createIncident({
+        title: analysis.title,
+        severity: analysis.severity,
+        status: "resolved",
+        confidence: analysis.confidence,
+        rawLogs: logs,
+        rootCause: analysis.rootCause,
+        fix: analysis.fix,
+        evidence: analysis.evidence,
+        nextSteps: analysis.nextSteps,
+        userId: req.apiUserId,
+      });
+      return res.status(201).json(incident);
+    } catch (error) {
+      console.error("API v1 analysis error:", error);
+      return res.status(500).json({ error: "Analysis failed. Please try again." });
+    }
+  });
+
+  app.get("/api/v1/incidents", apiKeyAuth, async (req: any, res) => {
+    const incidents = await storage.getIncidentsByUser(req.apiUserId);
+    return res.json({ data: incidents, total: incidents.length });
+  });
+
+  app.get("/api/v1/incidents/:id", apiKeyAuth, async (req: any, res) => {
+    const incident = await storage.getIncident(req.params.id as string);
+    if (!incident) return res.status(404).json({ error: "Incident not found." });
+    if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
+    return res.json(incident);
+  });
+
+  app.patch("/api/v1/incidents/:id/status", apiKeyAuth, async (req: any, res) => {
+    const { status } = req.body;
+    if (!["analyzing", "resolved", "critical"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be: analyzing, resolved, or critical." });
+    }
+    const incident = await storage.getIncident(req.params.id as string);
+    if (!incident) return res.status(404).json({ error: "Incident not found." });
+    if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
+    const updated = await storage.updateIncidentStatus(req.params.id as string, status);
+    return res.json(updated);
+  });
+
+  app.delete("/api/v1/incidents/:id", apiKeyAuth, async (req: any, res) => {
+    const incident = await storage.getIncident(req.params.id as string);
+    if (!incident) return res.status(404).json({ error: "Incident not found." });
+    if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
+    await storage.deleteIncident(req.params.id as string);
+    return res.json({ success: true });
   });
 
   return httpServer;

@@ -1,4 +1,4 @@
-import { type Incident, type InsertIncident, incidents } from "@shared/schema";
+import { type Incident, type InsertIncident, incidents, type ApiKey, type InsertApiKey, apiKeys } from "@shared/schema";
 import { desc, eq, and } from "drizzle-orm";
 import { db } from "./db";
 
@@ -10,6 +10,11 @@ export interface IStorage {
   updateIncidentStatus(id: string, status: Incident["status"]): Promise<Incident | undefined>;
   toggleStepCompletion(id: string, stepIndex: number): Promise<Incident | undefined>;
   deleteIncident(id: string): Promise<boolean>;
+  createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
+  getApiKeysByUser(userId: string): Promise<ApiKey[]>;
+  findApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
+  updateApiKeyLastUsed(id: string): Promise<void>;
+  revokeApiKey(userId: string, id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -57,6 +62,29 @@ export class DatabaseStorage implements IStorage {
 
   async deleteIncident(id: string): Promise<boolean> {
     const result = await db.delete(incidents).where(eq(incidents.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {
+    const [created] = await db.insert(apiKeys).values(apiKey as any).returning();
+    return created;
+  }
+
+  async getApiKeysByUser(userId: string): Promise<ApiKey[]> {
+    return db.select().from(apiKeys).where(eq(apiKeys.userId, userId)).orderBy(desc(apiKeys.createdAt));
+  }
+
+  async findApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
+    const [key] = await db.select().from(apiKeys).where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.revoked, false)));
+    return key;
+  }
+
+  async updateApiKeyLastUsed(id: string): Promise<void> {
+    await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, id));
+  }
+
+  async revokeApiKey(userId: string, id: string): Promise<boolean> {
+    const result = await db.update(apiKeys).set({ revoked: true }).where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId))).returning();
     return result.length > 0;
   }
 }
