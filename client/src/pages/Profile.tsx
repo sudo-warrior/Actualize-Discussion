@@ -37,6 +37,8 @@ interface ApiKeyInfo {
   key?: string;
   keyPrefix: string;
   revoked: boolean;
+  requestCount: number;
+  lastResetDate: string;
   lastUsedAt: string | null;
   createdAt: string;
 }
@@ -271,33 +273,46 @@ export default function Profile() {
                 <p className="text-xs text-muted-foreground text-center py-3">No API keys yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {apiKeys.map((k) => (
-                    <div key={k.id} data-testid={`row-api-key-${k.id}`} className="flex items-center gap-3 p-2 rounded-md bg-muted/10 border border-border/50">
-                      <Key className={`h-3.5 w-3.5 shrink-0 ${k.revoked ? "text-muted-foreground" : "text-primary"}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-medium truncate ${k.revoked ? "line-through text-muted-foreground" : ""}`}>{k.name}</span>
-                          {k.revoked && <Badge variant="outline" className="text-[9px] text-red-400 border-red-400/20">revoked</Badge>}
+                  {apiKeys.map((k) => {
+                    const now = new Date();
+                    const lastReset = new Date(k.lastResetDate);
+                    const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
+                    const currentCount = hoursSinceReset >= 24 ? 0 : k.requestCount;
+                    const remaining = 100 - currentCount;
+                    
+                    return (
+                      <div key={k.id} data-testid={`row-api-key-${k.id}`} className="flex items-center gap-3 p-2 rounded-md bg-muted/10 border border-border/50">
+                        <Key className={`h-3.5 w-3.5 shrink-0 ${k.revoked ? "text-muted-foreground" : "text-primary"}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium truncate ${k.revoked ? "line-through text-muted-foreground" : ""}`}>{k.name}</span>
+                            {k.revoked && <Badge variant="outline" className="text-[9px] text-red-400 border-red-400/20">revoked</Badge>}
+                            {!k.revoked && (
+                              <Badge variant="outline" className={`text-[9px] font-mono ${remaining < 20 ? "text-orange-400 border-orange-400/20" : "text-muted-foreground border-border"}`}>
+                                {remaining}/100
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            {k.keyPrefix}... · {formatDistanceToNow(new Date(k.createdAt), { addSuffix: true })}
+                            {k.lastUsedAt && ` · last used ${formatDistanceToNow(new Date(k.lastUsedAt), { addSuffix: true })}`}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground font-mono">
-                          {k.keyPrefix}... · {formatDistanceToNow(new Date(k.createdAt), { addSuffix: true })}
-                          {k.lastUsedAt && ` · last used ${formatDistanceToNow(new Date(k.lastUsedAt), { addSuffix: true })}`}
-                        </p>
-                      </div>
-                      {!k.revoked && (
-                        <Button
-                          data-testid={`button-revoke-key-${k.id}`}
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => revokeKeyMutation.mutate(k.id)}
-                          disabled={revokeKeyMutation.isPending}
+                        {!k.revoked && (
+                          <Button
+                            data-testid={`button-revoke-key-${k.id}`}
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => revokeKeyMutation.mutate(k.id)}
+                            disabled={revokeKeyMutation.isPending}
                           className="h-7 w-7 text-muted-foreground hover:text-red-400"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       )}
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </Card>

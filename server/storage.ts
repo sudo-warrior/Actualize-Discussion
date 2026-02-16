@@ -14,6 +14,8 @@ export interface IStorage {
   getApiKeysByUser(userId: string): Promise<ApiKey[]>;
   findApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
   updateApiKeyLastUsed(id: string): Promise<void>;
+  incrementApiKeyUsage(id: string): Promise<void>;
+  getApiKey(id: string): Promise<ApiKey | undefined>;
   revokeApiKey(userId: string, id: string): Promise<boolean>;
   saveStepGuidance(id: string, stepIndex: number, guidance: string): Promise<Incident | undefined>;
 }
@@ -82,6 +84,38 @@ export class DatabaseStorage implements IStorage {
 
   async updateApiKeyLastUsed(id: string): Promise<void> {
     await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, id));
+  }
+
+  async incrementApiKeyUsage(id: string): Promise<void> {
+    const key = await this.getApiKey(id);
+    if (!key) return;
+
+    const now = new Date();
+    const lastReset = new Date(key.lastResetDate);
+    const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
+
+    // Reset counter if more than 24 hours have passed
+    if (hoursSinceReset >= 24) {
+      await db.update(apiKeys)
+        .set({ 
+          requestCount: 1, 
+          lastResetDate: now,
+          lastUsedAt: now 
+        })
+        .where(eq(apiKeys.id, id));
+    } else {
+      await db.update(apiKeys)
+        .set({ 
+          requestCount: sql`${apiKeys.requestCount} + 1`,
+          lastUsedAt: now 
+        })
+        .where(eq(apiKeys.id, id));
+    }
+  }
+
+  async getApiKey(id: string): Promise<typeof apiKeys.$inferSelect | undefined> {
+    const [key] = await db.select().from(apiKeys).where(eq(apiKeys.id, id));
+    return key;
   }
 
   async revokeApiKey(userId: string, id: string): Promise<boolean> {

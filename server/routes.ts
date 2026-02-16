@@ -29,7 +29,36 @@ async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
     return res.status(401).json({ error: "Invalid or revoked API key." });
   }
 
-  storage.updateApiKeyLastUsed(apiKey.id).catch(() => {});
+  // Check rate limit
+  const DAILY_LIMIT = 100;
+  const now = new Date();
+  const lastReset = new Date(apiKey.lastResetDate);
+  const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
+
+  let currentCount = apiKey.requestCount;
+  
+  // Reset if 24 hours passed
+  if (hoursSinceReset >= 24) {
+    currentCount = 0;
+  }
+
+  if (currentCount >= DAILY_LIMIT) {
+    const hoursUntilReset = Math.ceil(24 - hoursSinceReset);
+    return res.status(429).json({ 
+      error: "Rate limit exceeded. You have reached the daily limit of 100 requests.",
+      limit: DAILY_LIMIT,
+      remaining: 0,
+      resetIn: `${hoursUntilReset} hours`
+    });
+  }
+
+  // Increment usage
+  await storage.incrementApiKeyUsage(apiKey.id);
+
+  // Set rate limit headers
+  res.setHeader("X-RateLimit-Limit", DAILY_LIMIT.toString());
+  res.setHeader("X-RateLimit-Remaining", (DAILY_LIMIT - currentCount - 1).toString());
+  res.setHeader("X-RateLimit-Reset", new Date(lastReset.getTime() + 24 * 60 * 60 * 1000).toISOString());
 
   req.apiUserId = apiKey.userId;
   next();
@@ -314,6 +343,8 @@ export async function registerRoutes(
       name: k.name,
       keyPrefix: k.keyPrefix,
       revoked: k.revoked,
+      requestCount: k.requestCount,
+      lastResetDate: k.lastResetDate,
       lastUsedAt: k.lastUsedAt,
       createdAt: k.createdAt,
     })));
