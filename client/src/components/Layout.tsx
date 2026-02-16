@@ -12,7 +12,8 @@ import {
   History,
   User,
   Menu,
-  X
+  X,
+  BookOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Incident } from "@shared/schema";
@@ -100,6 +101,15 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
             )}>
               <User className="h-4 w-4" />
               Profile
+          </Link>
+          <Link href="/docs" onClick={handleNavClick} className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              location === "/docs" 
+                ? "bg-primary/10 text-primary" 
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}>
+              <BookOpen className="h-4 w-4" />
+              API Docs
           </Link>
         </nav>
 
