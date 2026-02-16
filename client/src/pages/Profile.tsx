@@ -77,7 +77,15 @@ export default function Profile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
+      toast({ title: "API key revoked", description: "This key can no longer be used." });
     },
+  });
+
+  const handleRevokeKey = (keyId: string, keyName: string) => {
+    if (window.confirm(`Are you sure you want to revoke "${keyName}"? This action cannot be undone and the key will stop working immediately.`)) {
+      revokeKeyMutation.mutate(keyId);
+    }
+  };
   });
 
   const handleCopyKey = () => {
@@ -303,7 +311,7 @@ export default function Profile() {
                             data-testid={`button-revoke-key-${k.id}`}
                             variant="ghost"
                             size="icon"
-                            onClick={() => revokeKeyMutation.mutate(k.id)}
+                            onClick={() => handleRevokeKey(k.id, k.name)}
                             disabled={revokeKeyMutation.isPending}
                           className="h-7 w-7 text-muted-foreground hover:text-red-400"
                         >
