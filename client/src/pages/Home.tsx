@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -417,8 +419,10 @@ export default function Home() {
                                   </div>
                                 ) : (
                                   <>
-                                    <div className="max-h-[400px] overflow-y-auto text-xs text-foreground leading-relaxed whitespace-pre-wrap font-mono pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
-                                      {guidanceData[i]}
+                                    <div className="max-h-[400px] overflow-y-auto text-xs leading-relaxed pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent prose prose-sm prose-invert max-w-none">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {guidanceData[i]}
+                                      </ReactMarkdown>
                                     </div>
                                     <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
                                       {!isDone && (

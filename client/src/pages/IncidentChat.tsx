@@ -3,6 +3,8 @@ import { useRoute, useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -197,7 +199,11 @@ export default function IncidentChat() {
                       <span className="text-[10px] md:text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
                     </div>
                   )}
-                  <p className="text-xs md:text-sm whitespace-pre-wrap font-mono leading-relaxed break-words">{msg.content}</p>
+                  <div className="text-xs md:text-sm leading-relaxed break-words prose prose-sm prose-invert max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
                   <p className="text-[9px] md:text-[10px] text-muted-foreground/60 font-mono mt-2">
                     {new Date(msg.createdAt).toLocaleTimeString()}
                   </p>
@@ -213,7 +219,11 @@ export default function IncidentChat() {
                     <span className="text-[10px] md:text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
                     <Loader2 className="h-3 w-3 animate-spin text-primary ml-auto" />
                   </div>
-                  <p className="text-xs md:text-sm whitespace-pre-wrap font-mono leading-relaxed break-words">{streamingContent}</p>
+                  <div className="text-xs md:text-sm leading-relaxed break-words prose prose-sm prose-invert max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {streamingContent}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
             )}
