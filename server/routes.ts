@@ -64,62 +64,6 @@ async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
   next();
 }
 
-function hashApiKey(key: string): string {
-  return createHash("sha256").update(key).digest("hex");
-}
-
-async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
-  const header = req.headers["authorization"] || req.headers["x-api-key"];
-  let token: string | undefined;
-
-  if (typeof header === "string") {
-    token = header.startsWith("Bearer ") ? header.slice(7) : header;
-  }
-
-  if (!token) {
-    return res.status(401).json({ error: "Missing API key. Include it as Authorization: Bearer <key> or X-API-Key header." });
-  }
-
-  const keyHash = hashApiKey(token);
-  const apiKey = await storage.findApiKeyByHash(keyHash);
-  if (!apiKey) {
-    return res.status(401).json({ error: "Invalid or revoked API key." });
-  }
-
-  storage.updateApiKeyLastUsed(apiKey.id).catch(() => {});
-
-  req.apiUserId = apiKey.userId;
-  next();
-}
-
-function hashApiKey(key: string): string {
-  return createHash("sha256").update(key).digest("hex");
-}
-
-async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
-  const header = req.headers["authorization"] || req.headers["x-api-key"];
-  let token: string | undefined;
-
-  if (typeof header === "string") {
-    token = header.startsWith("Bearer ") ? header.slice(7) : header;
-  }
-
-  if (!token) {
-    return res.status(401).json({ error: "Missing API key. Include it as Authorization: Bearer <key> or X-API-Key header." });
-  }
-
-  const keyHash = hashApiKey(token);
-  const apiKey = await storage.findApiKeyByHash(keyHash);
-  if (!apiKey) {
-    return res.status(401).json({ error: "Invalid or revoked API key." });
-  }
-
-  storage.updateApiKeyLastUsed(apiKey.id).catch(() => {});
-
-  req.apiUserId = apiKey.userId;
-  next();
-}
-
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -435,7 +379,10 @@ export async function registerRoutes(
         nextSteps: analysis.nextSteps,
         userId: req.apiUserId,
       });
-      return res.status(201).json(incident);
+      return res.status(201).json({
+        success: true,
+        data: incident
+      });
     } catch (error) {
       console.error("API v1 analysis error:", error);
       return res.status(500).json({ error: "Analysis failed. Please try again." });
@@ -444,14 +391,21 @@ export async function registerRoutes(
 
   app.get("/api/v1/incidents", apiKeyAuth, async (req: any, res) => {
     const incidents = await storage.getIncidentsByUser(req.apiUserId);
-    return res.json({ data: incidents, total: incidents.length });
+    return res.json({ 
+      success: true,
+      data: incidents, 
+      total: incidents.length 
+    });
   });
 
   app.get("/api/v1/incidents/:id", apiKeyAuth, async (req: any, res) => {
     const incident = await storage.getIncident(req.params.id as string);
     if (!incident) return res.status(404).json({ error: "Incident not found." });
     if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
-    return res.json(incident);
+    return res.json({
+      success: true,
+      data: incident
+    });
   });
 
   app.patch("/api/v1/incidents/:id/status", apiKeyAuth, async (req: any, res) => {
@@ -463,7 +417,10 @@ export async function registerRoutes(
     if (!incident) return res.status(404).json({ error: "Incident not found." });
     if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
     const updated = await storage.updateIncidentStatus(req.params.id as string, status);
-    return res.json(updated);
+    return res.json({
+      success: true,
+      data: updated
+    });
   });
 
   app.delete("/api/v1/incidents/:id", apiKeyAuth, async (req: any, res) => {
@@ -471,7 +428,10 @@ export async function registerRoutes(
     if (!incident) return res.status(404).json({ error: "Incident not found." });
     if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
     await storage.deleteIncident(req.params.id as string);
-    return res.json({ success: true });
+    return res.json({ 
+      success: true,
+      message: "Incident deleted successfully"
+    });
   });
 
   return httpServer;

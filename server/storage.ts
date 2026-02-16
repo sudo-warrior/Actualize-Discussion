@@ -1,5 +1,5 @@
 import { type Incident, type InsertIncident, incidents, type ApiKey, type InsertApiKey, apiKeys } from "@shared/schema";
-import { desc, eq, and } from "drizzle-orm";
+import { desc, eq, and, sql } from "drizzle-orm";
 import { db } from "./db";
 
 export interface IStorage {
