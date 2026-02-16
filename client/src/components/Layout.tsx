@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -131,12 +132,12 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
         </div>
         {showSearch && (
           <div className="px-4 mb-2">
-            <input
+            <Input
               type="text"
               placeholder="Search incidents..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:border-primary font-mono"
+              className="h-8 text-xs bg-background border-border focus:border-primary font-mono"
               autoFocus
             />
           </div>
