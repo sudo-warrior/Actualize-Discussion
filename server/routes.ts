@@ -4,7 +4,93 @@ import { createHash, randomBytes } from "crypto";
 import { storage } from "./storage";
 import { analyzeLogsSchema } from "@shared/schema";
 import { analyzeLogs, getStepGuidance } from "./analyzer";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { isAuthenticated } from "./auth";
+import { registerChatRoutes } from "./replit_integrations/chat";
+
+function hashApiKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
+
+async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
+  const header = req.headers["authorization"] || req.headers["x-api-key"];
+  let token: string | undefined;
+
+  if (typeof header === "string") {
+    token = header.startsWith("Bearer ") ? header.slice(7) : header;
+  }
+
+  if (!token) {
+    return res.status(401).json({ error: "Missing API key. Include it as Authorization: Bearer <key> or X-API-Key header." });
+  }
+
+  const keyHash = hashApiKey(token);
+  const apiKey = await storage.findApiKeyByHash(keyHash);
+  if (!apiKey) {
+    return res.status(401).json({ error: "Invalid or revoked API key." });
+  }
+
+  // Check rate limit
+  const DAILY_LIMIT = 100;
+  const now = new Date();
+  const lastReset = new Date(apiKey.lastResetDate);
+  const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
+
+  let currentCount = apiKey.requestCount;
+  
+  // Reset if 24 hours passed
+  if (hoursSinceReset >= 24) {
+    currentCount = 0;
+  }
+
+  if (currentCount >= DAILY_LIMIT) {
+    const hoursUntilReset = Math.ceil(24 - hoursSinceReset);
+    return res.status(429).json({ 
+      error: "Rate limit exceeded. You have reached the daily limit of 100 requests.",
+      limit: DAILY_LIMIT,
+      remaining: 0,
+      resetIn: `${hoursUntilReset} hours`
+    });
+  }
+
+  // Increment usage
+  await storage.incrementApiKeyUsage(apiKey.id);
+
+  // Set rate limit headers
+  res.setHeader("X-RateLimit-Limit", DAILY_LIMIT.toString());
+  res.setHeader("X-RateLimit-Remaining", (DAILY_LIMIT - currentCount - 1).toString());
+  res.setHeader("X-RateLimit-Reset", new Date(lastReset.getTime() + 24 * 60 * 60 * 1000).toISOString());
+
+  req.apiUserId = apiKey.userId;
+  next();
+}
+
+function hashApiKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
+
+async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
+  const header = req.headers["authorization"] || req.headers["x-api-key"];
+  let token: string | undefined;
+
+  if (typeof header === "string") {
+    token = header.startsWith("Bearer ") ? header.slice(7) : header;
+  }
+
+  if (!token) {
+    return res.status(401).json({ error: "Missing API key. Include it as Authorization: Bearer <key> or X-API-Key header." });
+  }
+
+  const keyHash = hashApiKey(token);
+  const apiKey = await storage.findApiKeyByHash(keyHash);
+  if (!apiKey) {
+    return res.status(401).json({ error: "Invalid or revoked API key." });
+  }
+
+  storage.updateApiKeyLastUsed(apiKey.id).catch(() => {});
+
+  req.apiUserId = apiKey.userId;
+  next();
+}
 
 function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
@@ -38,8 +124,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  
+  // Register chat routes
+  registerChatRoutes(app, isAuthenticated);
 
   app.post("/api/incidents/analyze", isAuthenticated, async (req: any, res) => {
     try {
@@ -48,7 +135,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: parsed.error.errors[0].message });
       }
 
-      const userId = req.user?.claims?.sub;
+      const userId = req.user.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -77,7 +164,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/incidents", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -90,7 +177,7 @@ export async function registerRoutes(
     if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
     }
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (incident.userId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -102,7 +189,7 @@ export async function registerRoutes(
     if (!["analyzing", "resolved", "critical"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     const incident = await storage.getIncident(req.params.id as string);
     if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
@@ -115,7 +202,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/incidents/:id/steps/:stepIndex", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -135,7 +222,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/incidents/:id/steps/:stepIndex/guidance", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -150,13 +237,23 @@ export async function registerRoutes(
     if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= incident.nextSteps.length) {
       return res.status(400).json({ message: "Invalid step index" });
     }
+    
+    // Return cached guidance if available
+    if (incident.stepGuidance?.[stepIndex]) {
+      return res.json({ guidance: incident.stepGuidance[stepIndex], cached: true });
+    }
+    
     try {
       const guidance = await getStepGuidance(incident.nextSteps[stepIndex], {
         rootCause: incident.rootCause,
         fix: incident.fix,
         rawLogs: incident.rawLogs.slice(0, 2000),
       });
-      return res.json({ guidance });
+      
+      // Save guidance to DB
+      await storage.saveStepGuidance(req.params.id as string, stepIndex, guidance);
+      
+      return res.json({ guidance, cached: false });
     } catch (error) {
       console.error("Guidance error:", error);
       return res.status(500).json({ message: "Failed to generate guidance." });
@@ -164,7 +261,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/incidents/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -180,7 +277,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/incidents/stats/summary", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -236,7 +333,7 @@ export async function registerRoutes(
   // === API Key Management (session-protected) ===
 
   app.post("/api/keys", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const { name } = req.body;
@@ -266,7 +363,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/keys", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
     const keys = await storage.getApiKeysByUser(userId);
     return res.json(keys.map(k => ({
@@ -274,17 +371,46 @@ export async function registerRoutes(
       name: k.name,
       keyPrefix: k.keyPrefix,
       revoked: k.revoked,
+      requestCount: k.requestCount,
+      lastResetDate: k.lastResetDate,
       lastUsedAt: k.lastUsedAt,
       createdAt: k.createdAt,
     })));
   });
 
   app.delete("/api/keys/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
     const revoked = await storage.revokeApiKey(userId, req.params.id as string);
     if (!revoked) return res.status(404).json({ message: "API key not found." });
     return res.json({ success: true });
+  });
+
+  // User profile
+  app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    
+    const { username, firstName, lastName, phone, dob } = req.body;
+    
+    try {
+      const { supabase } = await import("./supabase");
+      const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          username,
+          firstName,
+          lastName,
+          phone,
+          dob
+        }
+      });
+      
+      if (error) throw error;
+      return res.json({ success: true, user: data.user });
+    } catch (error) {
+      console.error("Profile update error:", error);
+      return res.status(500).json({ message: "Failed to update profile" });
+    }
   });
 
   // === Developer API v1 (API key auth) ===

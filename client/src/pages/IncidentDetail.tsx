@@ -3,6 +3,18 @@ import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,7 +39,8 @@ import {
   Sparkles,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MessageSquare
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -40,6 +53,7 @@ export default function IncidentDetail() {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [guidanceData, setGuidanceData] = useState<Record<number, string>>({});
   const [loadingGuidance, setLoadingGuidance] = useState<number | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<Incident>({
     queryKey: [`/api/incidents/${incidentId}`],
@@ -56,9 +70,25 @@ export default function IncidentDetail() {
       const res = await apiRequest("PATCH", `/api/incidents/${incidentId}/steps/${stepIndex}`);
       return res.json() as Promise<Incident>;
     },
-    onSuccess: () => {
+    onSuccess: (updatedIncident) => {
       queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
+      
+      // Auto-update status based on completion
+      const completedCount = updatedIncident.completedSteps?.length || 0;
+      const totalSteps = updatedIncident.nextSteps.length;
+      
+      if (completedCount === totalSteps && updatedIncident.status !== "resolved") {
+        // All steps completed, mark as resolved
+        statusMutation.mutate("resolved");
+        toast({ 
+          title: "All steps completed!", 
+          description: "Incident marked as resolved." 
+        });
+      } else if (completedCount > 0 && updatedIncident.status === "resolved") {
+        // Steps uncompleted, revert to analyzing
+        statusMutation.mutate("analyzing");
+      }
     },
   });
 
@@ -361,9 +391,38 @@ export default function IncidentDetail() {
                                   <span>Generating step-by-step instructions...</span>
                                 </div>
                               ) : (
-                                <div className="text-xs text-foreground leading-relaxed whitespace-pre-wrap font-mono">
-                                  {guidanceData[i]}
-                                </div>
+                                <>
+                                  <div className="max-h-[400px] overflow-y-auto text-xs leading-relaxed pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent prose prose-sm prose-invert max-w-none">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                      {guidanceData[i]}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                                    {!isDone && (
+                                      <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="w-full text-xs font-mono bg-emerald-600 hover:bg-emerald-700"
+                                        onClick={() => {
+                                          toggleStepMutation.mutate(i);
+                                          toast({ title: "Step marked as complete!" });
+                                        }}
+                                      >
+                                        <CheckCircle2 className="h-3 w-3 mr-2" />
+                                        Mark Step as Complete
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full text-xs font-mono"
+                                      onClick={() => navigate(`/incidents/${incidentId}/chat?step=${i}`)}
+                                    >
+                                      <MessageSquare className="h-3 w-3 mr-2" />
+                                      Ask Follow-up Questions
+                                    </Button>
+                                  </div>
+                                </>
                               )}
                             </div>
                           </motion.div>
@@ -406,11 +465,7 @@ export default function IncidentDetail() {
             <Button
               data-testid="button-delete-incident"
               variant="outline"
-              onClick={() => {
-                if (confirm("Are you sure you want to delete this incident?")) {
-                  deleteMutation.mutate();
-                }
-              }}
+              onClick={() => setShowDeleteDialog(true)}
               className="w-full text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400 font-mono text-xs"
               disabled={deleteMutation.isPending}
             >
@@ -420,6 +475,31 @@ export default function IncidentDetail() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Incident</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this incident?
+              <br /><br />
+              This action cannot be undone. All incident data, analysis, and history will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteMutation.mutate();
+                setShowDeleteDialog(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Incident
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

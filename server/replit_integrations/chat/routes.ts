@@ -1,24 +1,14 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { GoogleGenAI } from "@google/genai";
 import { chatStorage } from "./storage";
 
-/*
-Supported models: gemini-2.5-flash (fast), gemini-2.5-pro (advanced reasoning)
-Usage: Include httpOptions with baseUrl and empty apiVersion when using AI Integrations (required)
-*/
-
-// This is using Replit's AI Integrations service, which provides Gemini-compatible API access without requiring your own Gemini API key.
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-  httpOptions: {
-    apiVersion: "",
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-  },
 });
 
-export function registerChatRoutes(app: Express): void {
+export function registerChatRoutes(app: Express, isAuthenticated: RequestHandler): void {
   // Get all conversations
-  app.get("/api/conversations", async (req: Request, res: Response) => {
+  app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const conversations = await chatStorage.getAllConversations();
       res.json(conversations);
@@ -29,7 +19,7 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Get single conversation with messages
-  app.get("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id as string);
       const conversation = await chatStorage.getConversation(id);
@@ -45,10 +35,14 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Create new conversation
-  app.post("/api/conversations", async (req: Request, res: Response) => {
+  app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const { title } = req.body;
-      const conversation = await chatStorage.createConversation(title || "New Chat");
+      const { title, incidentId, stepIndex } = req.body;
+      const conversation = await chatStorage.createConversation(
+        title || "New Chat",
+        incidentId,
+        stepIndex
+      );
       res.status(201).json(conversation);
     } catch (error) {
       console.error("Error creating conversation:", error);
@@ -57,7 +51,7 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Delete conversation
-  app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id as string);
       await chatStorage.deleteConversation(id);
@@ -69,7 +63,7 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Send message and get AI response (streaming)
-  app.post("/api/conversations/:id/messages", async (req: Request, res: Response) => {
+  app.post("/api/conversations/:id/messages", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const conversationId = parseInt(req.params.id as string);
       const { content } = req.body;

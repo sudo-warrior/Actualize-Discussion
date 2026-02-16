@@ -6,6 +6,8 @@ import { sql } from "drizzle-orm";
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
+  incidentId: text("incident_id"),
+  stepIndex: integer("step_index"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 

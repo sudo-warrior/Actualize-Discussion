@@ -2,6 +2,14 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Activity, 
   Terminal, 
@@ -13,7 +21,9 @@ import {
   User,
   Menu,
   X,
-  BookOpen
+  BookOpen,
+  Settings,
+  ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Incident } from "@shared/schema";
@@ -28,13 +38,22 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
   const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
 
   const { data: incidents = [] } = useQuery<Incident[]>({
     queryKey: ["/api/incidents"],
     refetchInterval: 10000,
   });
 
-  const recentIncidents = incidents.slice(0, 6);
+  const filteredIncidents = searchQuery
+    ? incidents.filter(i => 
+        i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.rawLogs.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : incidents;
+
+  const recentIncidents = filteredIncidents.slice(0, 6);
 
   const handleNavClick = () => setMobileOpen(false);
 
@@ -93,14 +112,14 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
               <History className="h-4 w-4" />
               History
           </Link>
-          <Link href="/profile" onClick={handleNavClick} className={cn(
+          <Link href="/docs" onClick={handleNavClick} className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              location === "/profile" 
+              location === "/docs" 
                 ? "bg-primary/10 text-primary" 
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}>
-              <User className="h-4 w-4" />
-              Profile
+              <BookOpen className="h-4 w-4" />
+              API Docs
           </Link>
           <Link href="/docs" onClick={handleNavClick} className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
@@ -115,8 +134,23 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
 
         <div className="px-4 mb-2 text-xs font-mono text-muted-foreground uppercase tracking-wider flex items-center justify-between">
           <span>Recent Incidents</span>
-          <Search className="h-3 w-3 cursor-pointer hover:text-foreground" />
+          <Search 
+            className="h-3 w-3 cursor-pointer hover:text-foreground transition-colors" 
+            onClick={() => setShowSearch(!showSearch)}
+          />
         </div>
+        {showSearch && (
+          <div className="px-4 mb-2">
+            <Input
+              type="text"
+              placeholder="Search incidents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 text-xs bg-background border-border focus:border-primary font-mono"
+              autoFocus
+            />
+          </div>
+        )}
         <div className="space-y-1 px-2">
           {recentIncidents.length === 0 && (
             <p className="text-xs text-muted-foreground px-3 py-4 text-center">No incidents yet. Analyze some logs to get started.</p>
@@ -146,29 +180,35 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
       </div>
 
       <div className="p-4 border-t border-border bg-card/30">
-        <div className="flex items-center gap-3">
-          {user?.profileImageUrl ? (
-            <img src={user.profileImageUrl} alt="" className="h-8 w-8 rounded border border-primary/30 object-cover" />
-          ) : (
-            <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 text-primary font-bold text-xs">
-              {(user?.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="w-full flex items-center gap-3 hover:bg-muted/50 p-2 rounded-md transition-colors">
+            {user?.user_metadata?.profileImageUrl ? (
+              <img src={user.user_metadata.profileImageUrl} alt="" className="h-8 w-8 rounded border border-primary/30 object-cover" />
+            ) : (
+              <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 text-primary font-bold text-xs">
+                {(user?.user_metadata?.firstName?.[0] || user?.email?.[0] || "?").toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-medium truncate">
+                {user?.user_metadata?.firstName ? `${user.user_metadata.firstName}${user.user_metadata.lastName ? ` ${user.user_metadata.lastName}` : ""}` : user?.email || ""}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
             </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {user?.firstName ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}` : user?.email || "Operator"}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email || "System Admin"}</p>
-          </div>
-          <button
-            data-testid="button-logout"
-            onClick={() => logout()}
-            className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-            title="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={() => window.location.href = "/profile"}>
+              <Settings className="h-4 w-4 mr-2" />
+              Profile & Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </>
   );

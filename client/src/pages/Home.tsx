@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -24,7 +26,9 @@ import {
   Sparkles,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MessageSquare,
+  CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -89,6 +93,17 @@ export default function Home() {
     onSuccess: (data) => {
       setResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
+      
+      // Auto-update status based on completion
+      const completedCount = data.completedSteps?.length || 0;
+      const totalSteps = data.nextSteps.length;
+      
+      if (completedCount === totalSteps) {
+        toast({ 
+          title: "All steps completed!", 
+          description: "Great work! Incident resolved." 
+        });
+      }
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
@@ -403,9 +418,38 @@ export default function Home() {
                                     <span>Generating step-by-step instructions...</span>
                                   </div>
                                 ) : (
-                                  <div className="text-xs text-foreground leading-relaxed whitespace-pre-wrap font-mono max-h-[400px] overflow-y-auto">
-                                    {guidanceData[i]}
-                                  </div>
+                                  <>
+                                    <div className="max-h-[400px] overflow-y-auto text-xs leading-relaxed pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent prose prose-sm prose-invert max-w-none">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {guidanceData[i]}
+                                      </ReactMarkdown>
+                                    </div>
+                                    <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                                      {!isDone && (
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          className="w-full text-xs font-mono bg-emerald-600 hover:bg-emerald-700"
+                                          onClick={() => {
+                                            toggleStepMutation.mutate({ incidentId: result.id, stepIndex: i });
+                                            toast({ title: "Step marked as complete!" });
+                                          }}
+                                        >
+                                          <CheckCircle2 className="h-3 w-3 mr-2" />
+                                          Mark Step as Complete
+                                        </Button>
+                                      )}
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full text-xs font-mono"
+                                        onClick={() => navigate(`/incidents/${result.id}/chat?step=${i}`)}
+                                      >
+                                        <MessageSquare className="h-3 w-3 mr-2" />
+                                        Ask Follow-up Questions
+                                      </Button>
+                                    </div>
+                                  </>
                                 )}
                               </div>
                             </motion.div>

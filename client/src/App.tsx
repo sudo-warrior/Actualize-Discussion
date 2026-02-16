@@ -10,8 +10,11 @@ import Dashboard from "@/pages/Dashboard";
 import History from "@/pages/History";
 import Profile from "@/pages/Profile";
 import IncidentDetail from "@/pages/IncidentDetail";
+import IncidentChat from "@/pages/IncidentChat";
 import ApiDocs from "@/pages/ApiDocs";
 import Landing from "@/pages/Landing";
+import Onboarding from "@/pages/Onboarding";
+import Login from "@/pages/Login";
 import { Loader2 } from "lucide-react";
 
 function AuthenticatedRouter() {
@@ -22,6 +25,7 @@ function AuthenticatedRouter() {
       <Route path="/history" component={History} />
       <Route path="/profile" component={Profile} />
       <Route path="/docs" component={ApiDocs} />
+      <Route path="/incidents/:id/chat" component={IncidentChat} />
       <Route path="/incidents/:id" component={IncidentDetail} />
       <Route component={NotFound} />
     </Switch>
@@ -29,7 +33,7 @@ function AuthenticatedRouter() {
 }
 
 function AppContent() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -44,6 +48,11 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return <Landing />;
+  }
+
+  // Check if user needs onboarding
+  if (!user?.user_metadata?.firstName || !user?.user_metadata?.username) {
+    return <Onboarding />;
   }
 
   return <AuthenticatedRouter />;

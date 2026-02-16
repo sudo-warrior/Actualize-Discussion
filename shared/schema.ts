@@ -13,6 +13,8 @@ export const apiKeys = pgTable("api_keys", {
   keyHash: text("key_hash").notNull(),
   keyPrefix: varchar("key_prefix", { length: 12 }).notNull(),
   revoked: boolean("revoked").notNull().default(false),
+  requestCount: integer("request_count").notNull().default(0),
+  lastResetDate: timestamp("last_reset_date").defaultNow().notNull(),
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -39,6 +41,7 @@ export const incidents = pgTable("incidents", {
   evidence: text("evidence").array().notNull(),
   nextSteps: text("next_steps").array().notNull(),
   completedSteps: integer("completed_steps").array().notNull().default(sql`'{}'::integer[]`),
+  stepGuidance: text("step_guidance").array().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

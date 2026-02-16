@@ -4,6 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Incident } from "@shared/schema";
@@ -37,6 +47,8 @@ interface ApiKeyInfo {
   key?: string;
   keyPrefix: string;
   revoked: boolean;
+  requestCount: number;
+  lastResetDate: string;
   lastUsedAt: string | null;
   createdAt: string;
 }
@@ -46,6 +58,7 @@ export default function Profile() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [newKeyName, setNewKeyName] = useState("");
+  const [keyToRevoke, setKeyToRevoke] = useState<{ id: string; name: string } | null>(null);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
@@ -75,8 +88,16 @@ export default function Profile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
+      toast({ title: "API key revoked", description: "This key can no longer be used." });
+      setKeyToRevoke(null);
     },
   });
+
+  const handleRevokeKey = () => {
+    if (keyToRevoke) {
+      revokeKeyMutation.mutate(keyToRevoke.id);
+    }
+  };
 
   const handleCopyKey = () => {
     if (newlyCreatedKey) {
@@ -117,18 +138,18 @@ export default function Profile() {
         <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-20">
           <div className="lg:col-span-1 space-y-6">
             <Card className="p-6 bg-card/50 border-border text-center">
-              {user?.profileImageUrl ? (
-                <img src={user.profileImageUrl} alt="" className="h-20 w-20 rounded-full border-2 border-primary/30 object-cover mx-auto mb-4" />
+              {user?.user_metadata?.profileImageUrl ? (
+                <img src={user.user_metadata.profileImageUrl} alt="" className="h-20 w-20 rounded-full border-2 border-primary/30 object-cover mx-auto mb-4" />
               ) : (
                 <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30 text-primary font-bold text-2xl mx-auto mb-4">
-                  {(user?.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                  {(user?.user_metadata?.firstName?.[0] || user?.email?.[0] || "?").toUpperCase()}
                 </div>
               )}
               <h2 data-testid="text-user-name" className="text-lg font-bold">
-                {user?.firstName ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}` : "Operator"}
+                {user?.user_metadata?.firstName ? `${user.user_metadata.firstName}${user.user_metadata.lastName ? ` ${user.user_metadata.lastName}` : ""}` : user?.email || ""}
               </h2>
               <p className="text-sm text-muted-foreground font-mono mt-1 flex items-center justify-center gap-1">
-                <Mail className="h-3 w-3" /> {user?.email || "No email"}
+                <Mail className="h-3 w-3" /> {user?.email || ""}
               </p>
               <div className="mt-4 pt-4 border-t border-border">
                 <Button
@@ -158,7 +179,7 @@ export default function Profile() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Auth method</span>
-                  <span className="font-mono text-xs">Replit Auth</span>
+                  <span className="font-mono text-xs">Supabase Auth</span>
                 </div>
               </div>
             </Card>
@@ -271,33 +292,46 @@ export default function Profile() {
                 <p className="text-xs text-muted-foreground text-center py-3">No API keys yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {apiKeys.map((k) => (
-                    <div key={k.id} data-testid={`row-api-key-${k.id}`} className="flex items-center gap-3 p-2 rounded-md bg-muted/10 border border-border/50">
-                      <Key className={`h-3.5 w-3.5 shrink-0 ${k.revoked ? "text-muted-foreground" : "text-primary"}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-medium truncate ${k.revoked ? "line-through text-muted-foreground" : ""}`}>{k.name}</span>
-                          {k.revoked && <Badge variant="outline" className="text-[9px] text-red-400 border-red-400/20">revoked</Badge>}
+                  {apiKeys.map((k) => {
+                    const now = new Date();
+                    const lastReset = new Date(k.lastResetDate);
+                    const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
+                    const currentCount = hoursSinceReset >= 24 ? 0 : k.requestCount;
+                    const remaining = 100 - currentCount;
+                    
+                    return (
+                      <div key={k.id} data-testid={`row-api-key-${k.id}`} className="flex items-center gap-3 p-2 rounded-md bg-muted/10 border border-border/50">
+                        <Key className={`h-3.5 w-3.5 shrink-0 ${k.revoked ? "text-muted-foreground" : "text-primary"}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium truncate ${k.revoked ? "line-through text-muted-foreground" : ""}`}>{k.name}</span>
+                            {k.revoked && <Badge variant="outline" className="text-[9px] text-red-400 border-red-400/20">revoked</Badge>}
+                            {!k.revoked && (
+                              <Badge variant="outline" className={`text-[9px] font-mono ${remaining < 20 ? "text-orange-400 border-orange-400/20" : "text-muted-foreground border-border"}`}>
+                                {remaining}/100
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            {k.keyPrefix}... · {formatDistanceToNow(new Date(k.createdAt), { addSuffix: true })}
+                            {k.lastUsedAt && ` · last used ${formatDistanceToNow(new Date(k.lastUsedAt), { addSuffix: true })}`}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground font-mono">
-                          {k.keyPrefix}... · {formatDistanceToNow(new Date(k.createdAt), { addSuffix: true })}
-                          {k.lastUsedAt && ` · last used ${formatDistanceToNow(new Date(k.lastUsedAt), { addSuffix: true })}`}
-                        </p>
-                      </div>
-                      {!k.revoked && (
-                        <Button
-                          data-testid={`button-revoke-key-${k.id}`}
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => revokeKeyMutation.mutate(k.id)}
-                          disabled={revokeKeyMutation.isPending}
+                        {!k.revoked && (
+                          <Button
+                            data-testid={`button-revoke-key-${k.id}`}
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setKeyToRevoke({ id: k.id, name: k.name })}
+                            disabled={revokeKeyMutation.isPending}
                           className="h-7 w-7 text-muted-foreground hover:text-red-400"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       )}
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </Card>
@@ -346,6 +380,28 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!keyToRevoke} onOpenChange={(open) => !open && setKeyToRevoke(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to revoke <span className="font-mono font-semibold">"{keyToRevoke?.name}"</span>?
+              <br /><br />
+              This action cannot be undone and the key will stop working immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRevokeKey}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Revoke Key
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
