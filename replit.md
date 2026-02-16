@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 - **Framework**: React with TypeScript, bundled by Vite
-- **Routing**: Wouter with views: Landing (unauthenticated), Home (`/`), Dashboard (`/dashboard`), History (`/history`), Profile (`/profile`), Incident Detail (`/incidents/:id`)
+- **Routing**: Wouter with views: Landing (unauthenticated), Home (`/`), Dashboard (`/dashboard`), History (`/history`), Profile (`/profile`), Incident Detail (`/incidents/:id`), API Docs (`/docs`)
 - **Authentication**: Replit Auth via `useAuth()` hook. Landing page shown when logged out.
 - **State Management**: TanStack React Query for server state, local React state for UI
 - **UI Components**: shadcn/ui component library (new-york style) built on Radix UI primitives
@@ -37,16 +37,26 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express 5 on Node.js, written in TypeScript (executed via tsx)
 - **Authentication**: Replit Auth (OpenID Connect) via `server/replit_integrations/auth/`
 - **AI Analysis**: Gemini 2.5 Flash via Replit AI Integrations (no personal API key needed, billed to Replit credits)
-- **API Pattern**: RESTful JSON API under `/api/` prefix
-- **Key Endpoints** (all protected by `isAuthenticated` middleware except auth routes):
+- **API Pattern**: RESTful JSON API under `/api/` prefix (session auth) and `/api/v1/` prefix (API key auth for developers)
+- **Key Endpoints** (session-protected via `isAuthenticated` middleware):
   - `POST /api/incidents/analyze` — Submit logs for AI analysis, creates an incident record
   - `GET /api/incidents` — List user's incidents (filtered by userId)
   - `GET /api/incidents/:id` — Get single incident details
   - `PATCH /api/incidents/:id/status` — Update incident status
   - `GET /api/incidents/stats/summary` — Dashboard metrics (real data from DB)
+  - `POST /api/keys` — Create a new API key (returns raw key once)
+  - `GET /api/keys` — List user's API keys (prefix only, no raw keys)
+  - `DELETE /api/keys/:id` — Revoke an API key
   - `GET /api/login` — Begin Replit Auth login flow
   - `GET /api/logout` — Logout
   - `GET /api/auth/user` — Get current authenticated user
+- **Developer API v1 Endpoints** (API key auth via `apiKeyAuth` middleware, `Authorization: Bearer` or `X-API-Key`):
+  - `POST /api/v1/incidents/analyze` — Submit logs for analysis
+  - `GET /api/v1/incidents` — List incidents
+  - `GET /api/v1/incidents/:id` — Get incident details
+  - `PATCH /api/v1/incidents/:id/status` — Update incident status
+  - `DELETE /api/v1/incidents/:id` — Delete an incident
+- **API Key Security**: Keys are hashed (SHA-256) before storage; only the prefix (`ic_xxxxxxxx`) is stored in plaintext. Raw key shown once on creation. Keys can be revoked. `lastUsedAt` tracked per key.
 - **Log Analysis**: Gemini AI with strict prompt engineering (only analyzes logs, rejects non-log input). Falls back to regex pattern matching if AI is unavailable.
 - **Validation**: Zod schemas (shared between client and server via `drizzle-zod`)
 
@@ -57,6 +67,7 @@ Preferred communication style: Simple, everyday language.
 - **Schema Push**: Use `npm run db:push` to sync schema to database
 - **Tables**:
   - `incidents` — id (UUID), userId, title, severity, status, confidence, rawLogs, rootCause, fix, evidence[], nextSteps[], completedSteps[], createdAt
+  - `api_keys` — id (UUID), userId, name, keyHash (SHA-256), keyPrefix, revoked, lastUsedAt, createdAt
   - `users` — Replit Auth user records (id, email, firstName, lastName, profileImageUrl)
   - `sessions` — Express session storage for auth
   - `conversations` / `messages` — Chat integration tables (from Gemini blueprint)

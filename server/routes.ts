@@ -35,6 +35,34 @@ async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
   next();
 }
 
+function hashApiKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
+
+async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
+  const header = req.headers["authorization"] || req.headers["x-api-key"];
+  let token: string | undefined;
+
+  if (typeof header === "string") {
+    token = header.startsWith("Bearer ") ? header.slice(7) : header;
+  }
+
+  if (!token) {
+    return res.status(401).json({ error: "Missing API key. Include it as Authorization: Bearer <key> or X-API-Key header." });
+  }
+
+  const keyHash = hashApiKey(token);
+  const apiKey = await storage.findApiKeyByHash(keyHash);
+  if (!apiKey) {
+    return res.status(401).json({ error: "Invalid or revoked API key." });
+  }
+
+  storage.updateApiKeyLastUsed(apiKey.id).catch(() => {});
+
+  req.apiUserId = apiKey.userId;
+  next();
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
