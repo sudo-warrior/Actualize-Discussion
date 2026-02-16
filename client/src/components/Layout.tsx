@@ -152,14 +152,14 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
               <img src={user.user_metadata.profileImageUrl} alt="" className="h-8 w-8 rounded border border-primary/30 object-cover" />
             ) : (
               <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 text-primary font-bold text-xs">
-                {(user?.user_metadata?.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                {(user?.user_metadata?.firstName?.[0] || user?.email?.[0] || "?").toUpperCase()}
               </div>
             )}
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-medium truncate">
-                {user?.user_metadata?.firstName ? `${user.user_metadata.firstName}${user.user_metadata.lastName ? ` ${user.user_metadata.lastName}` : ""}` : user?.email || "Operator"}
+                {user?.user_metadata?.firstName ? `${user.user_metadata.firstName}${user.user_metadata.lastName ? ` ${user.user_metadata.lastName}` : ""}` : user?.email || ""}
               </p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email || "System Admin"}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
             </div>
             <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
           </DropdownMenuTrigger>
