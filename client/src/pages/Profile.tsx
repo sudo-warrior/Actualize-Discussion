@@ -86,7 +86,6 @@ export default function Profile() {
       revokeKeyMutation.mutate(keyId);
     }
   };
-  });
 
   const handleCopyKey = () => {
     if (newlyCreatedKey) {
