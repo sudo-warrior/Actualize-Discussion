@@ -117,18 +117,18 @@ export default function Profile() {
         <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-20">
           <div className="lg:col-span-1 space-y-6">
             <Card className="p-6 bg-card/50 border-border text-center">
-              {user?.profileImageUrl ? (
-                <img src={user.profileImageUrl} alt="" className="h-20 w-20 rounded-full border-2 border-primary/30 object-cover mx-auto mb-4" />
+              {user?.user_metadata?.profileImageUrl ? (
+                <img src={user.user_metadata.profileImageUrl} alt="" className="h-20 w-20 rounded-full border-2 border-primary/30 object-cover mx-auto mb-4" />
               ) : (
                 <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30 text-primary font-bold text-2xl mx-auto mb-4">
-                  {(user?.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                  {(user?.user_metadata?.firstName?.[0] || user?.email?.[0] || "?").toUpperCase()}
                 </div>
               )}
               <h2 data-testid="text-user-name" className="text-lg font-bold">
-                {user?.firstName ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}` : "Operator"}
+                {user?.user_metadata?.firstName ? `${user.user_metadata.firstName}${user.user_metadata.lastName ? ` ${user.user_metadata.lastName}` : ""}` : user?.email || ""}
               </h2>
               <p className="text-sm text-muted-foreground font-mono mt-1 flex items-center justify-center gap-1">
-                <Mail className="h-3 w-3" /> {user?.email || "No email"}
+                <Mail className="h-3 w-3" /> {user?.email || ""}
               </p>
               <div className="mt-4 pt-4 border-t border-border">
                 <Button
