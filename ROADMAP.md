@@ -25,12 +25,15 @@
 - **Effort**: High
 
 ### 4. Export Reports
-- PDF export of incident details
+- PDF export of incident details using **Foxit Document Generation API**
+- Process and enhance PDFs with **Foxit PDF Services API**
 - CSV export for bulk analysis
 - Custom report templates
 - Include charts and graphs
-- **Tech**: PDFKit, csv-writer
+- Automated incident report generation workflow
+- **Tech**: Foxit APIs, csv-writer
 - **Effort**: Medium
+- **Hackathon Opportunity**: Foxit Software Challenge ($1,000 prize)
 
 ### 5. Incident History Timeline
 - Visual timeline of incident progression
@@ -306,6 +309,119 @@
 - Team collaboration metrics
 - Cost per incident analyzed
 - ROI on automation
+
+---
+
+## DeveloperWeek 2026 Hackathon Opportunities
+
+### Recommended Challenges for This Project
+
+#### 1. Foxit Software: Document Automation ($1,000)
+**Perfect Fit**: Export Reports Feature (#4)
+- Use Foxit Document Generation API to create incident reports
+- Use Foxit PDF Services API to enhance/process reports
+- Complete "input → output" workflow for incident documentation
+- **Prize**: $750 (1st) or $250 (2nd) gift card
+- **Contact**: jorge_euceda@foxitsoftware.com
+
+**Implementation Ideas**:
+- Generate PDF reports with incident timeline, analysis, and resolution steps
+- Add watermarks, signatures, or annotations to reports
+- Merge multiple incident reports into one document
+- Convert logs to searchable PDFs
+- Auto-generate executive summaries
+
+#### 2. Kilo: For Devs, By Devs ($4,000)
+**Good Fit**: Open source developer tool
+- This incident management system is already a dev tool
+- Could enhance with Kilo integrations
+- **Prize**: $1,500 + $1,500 credits (1st) or $500 + $500 credits (2nd)
+- **Contact**: developerweek25@kilo.ai
+
+**Implementation Ideas**:
+- Kilo CLI integration for incident analysis
+- VS Code extension for log analysis
+- Code review integration to catch potential incidents
+
+#### 3. Deepgram: Smart Listener ($1,000+)
+**Interesting Fit**: Voice-based incident reporting
+- Use Deepgram STT to analyze voice logs or incident reports
+- Summarize incident meetings
+- Extract action items from voice memos
+- **Prize**: Keychron K2 keyboard (up to 5)
+- **Contact**: corey.weathers@deepgram.com
+
+**Implementation Ideas**:
+- Voice-to-incident: Speak your incident, AI analyzes it
+- Meeting transcription → incident creation
+- Voice commands for incident management
+
+#### 4. You.com: Build Intelligent Applications ($400)
+**Good Fit**: Real-time research for incident resolution
+- Use You.com APIs for live web search during incident analysis
+- Citation-backed resolution suggestions
+- **Prize**: $200 gift card + $200 credits (1st)
+- **Contact**: mariane.bekker@you.com
+
+**Implementation Ideas**:
+- Search Stack Overflow/GitHub for similar errors
+- Find recent CVEs or security advisories
+- Research best practices for incident resolution
+
+#### 5. Akamai/Linode: Open-Source on Cloud ($5,000+ value)
+**Strong Fit**: Deploy this open-source project
+- Deploy on Linode Kubernetes Engine
+- Showcase scalable incident management
+- **Prize**: Nvidia Jetson Orin Nano (up to 5)
+- **Setup**: $1,000 promotional credit provided
+
+**Implementation Ideas**:
+- Kubernetes deployment with auto-scaling
+- GPU-accelerated AI analysis
+- Multi-region deployment for global teams
+
+#### 6. Miro: Build a Miro App ($500+)
+**Creative Fit**: Visual incident timeline
+- Create Miro app for incident visualization
+- Collaborative incident war rooms
+- **Prize**: Bose Headset + Lego (1st)
+- **Contact**: shipra@miro.com
+
+**Implementation Ideas**:
+- Visual incident timeline on Miro board
+- Team collaboration during incident response
+- Incident relationship mapping
+
+---
+
+## Hackathon Strategy
+
+### Phase 1: Core Enhancement (Week 1-2)
+Focus on **Foxit PDF Export** as primary hackathon submission:
+1. Integrate Foxit Document Generation API
+2. Integrate Foxit PDF Services API
+3. Create polished incident report templates
+4. Build demo video showing workflow
+5. Document the integration
+
+### Phase 2: Secondary Submissions (Week 2-3)
+If time permits, add:
+- Deepgram voice integration (quick win)
+- You.com research integration (enhances AI)
+- Deploy on Linode (infrastructure showcase)
+
+### Phase 3: Polish & Submit (Week 3-4)
+- Create demo videos for each challenge
+- Write clear documentation
+- Prepare pitch decks
+- Submit to multiple challenges
+
+### Winning Strategy
+1. **Focus on Foxit first** - Best fit, clear requirements
+2. **Show complete workflow** - Input logs → Generate report → Process PDF → Deliver
+3. **Emphasize real-world use** - Incident documentation is critical for teams
+4. **Quality over quantity** - One polished submission beats multiple rushed ones
+5. **Document everything** - Clear setup instructions, architecture diagrams
 
 ---
 
