@@ -158,7 +158,7 @@ export default function Profile() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Auth method</span>
-                  <span className="font-mono text-xs">Replit Auth</span>
+                  <span className="font-mono text-xs">Supabase Auth</span>
                 </div>
               </div>
             </Card>
