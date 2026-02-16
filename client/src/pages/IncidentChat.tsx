@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Loader2, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Send, Loader2, Sparkles, Terminal, Zap } from "lucide-react";
 import type { Incident } from "@shared/schema";
 
 interface Message {
@@ -50,7 +51,6 @@ export default function IncidentChat() {
     refetchInterval: streaming ? false : 3000,
   });
 
-  // Create conversation on mount
   useEffect(() => {
     if (incident && !conversationId) {
       const createConversation = async () => {
@@ -128,93 +128,134 @@ export default function IncidentChat() {
   };
 
   const messages = conversation?.messages || [];
-  const allMessages = streaming
-    ? [...messages, { id: -1, role: "user", content: input, createdAt: new Date().toISOString() }]
-    : messages;
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(`/incidents/${incidentId}`)}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold">{conversation?.title || "Loading..."}</h1>
-            {stepIndex && incident && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Step: {incident.nextSteps[parseInt(stepIndex)]}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <Card className="p-4 min-h-[500px] max-h-[600px] overflow-y-auto flex flex-col gap-4">
-          {allMessages.map((msg, i) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+      <div className="max-w-5xl mx-auto space-y-4">
+        <Card className="p-4 border-border bg-gradient-to-r from-card via-card to-primary/5 border-l-4 border-l-primary">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(`/incidents/${incidentId}`)}
+              className="h-9 w-9 hover:bg-primary/10"
             >
-              <div
-                className={`max-w-[80%] rounded-lg p-3 ${
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                {msg.role === "assistant" && (
-                  <div className="flex items-center gap-2 mb-2 text-primary">
-                    <Sparkles className="h-3 w-3" />
-                    <span className="text-xs font-mono uppercase">AI Assistant</span>
-                  </div>
-                )}
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-              </div>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="h-10 w-10 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-primary" />
             </div>
-          ))}
-
-          {streaming && streamingContent && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-lg p-3 bg-muted">
-                <div className="flex items-center gap-2 mb-2 text-primary">
-                  <Sparkles className="h-3 w-3" />
-                  <span className="text-xs font-mono uppercase">AI Assistant</span>
-                </div>
-                <p className="text-sm whitespace-pre-wrap">{streamingContent}</p>
-              </div>
+            <div className="flex-1">
+              <h1 className="text-lg font-bold font-mono flex items-center gap-2">
+                <Terminal className="h-4 w-4 text-primary" />
+                AI Guidance Assistant
+              </h1>
+              {stepIndex && incident && (
+                <p className="text-xs text-muted-foreground font-mono mt-1 flex items-center gap-2">
+                  <Zap className="h-3 w-3" />
+                  Step {parseInt(stepIndex) + 1}: {incident.nextSteps[parseInt(stepIndex)]?.slice(0, 80)}...
+                </p>
+              )}
             </div>
-          )}
-
-          <div ref={messagesEndRef} />
+            <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary">
+              Live Chat
+            </Badge>
+          </div>
         </Card>
 
-        <div className="flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder="Ask a follow-up question..."
-            className="min-h-[60px]"
-            disabled={streaming}
-          />
-          <Button
-            onClick={sendMessage}
-            disabled={!input.trim() || streaming}
-            size="icon"
-            className="h-[60px] w-[60px]"
-          >
-            {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </div>
+        <Card className="p-0 border-border bg-card/50 backdrop-blur-sm overflow-hidden">
+          <div className="h-[calc(100vh-320px)] overflow-y-auto px-6 py-6 space-y-4 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+            {messages.length === 0 && !streaming && (
+              <div className="flex items-center justify-center h-full text-center">
+                <div className="space-y-3">
+                  <div className="h-16 w-16 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto">
+                    <Sparkles className="h-8 w-8 text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground font-mono">
+                    Ask me anything about this remediation step
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg p-4 ${
+                    msg.role === "user"
+                      ? "bg-primary/90 text-primary-foreground border border-primary shadow-lg shadow-primary/20"
+                      : "bg-muted/80 border border-border/50 backdrop-blur-sm"
+                  }`}
+                >
+                  {msg.role === "assistant" && (
+                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/30">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
+                    </div>
+                  )}
+                  <p className="text-sm whitespace-pre-wrap font-mono leading-relaxed">{msg.content}</p>
+                  <p className="text-[10px] text-muted-foreground/60 font-mono mt-2">
+                    {new Date(msg.createdAt).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {streaming && streamingContent && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg p-4 bg-muted/80 border border-border/50 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/30">
+                    <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+                    <span className="text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
+                    <Loader2 className="h-3 w-3 animate-spin text-primary ml-auto" />
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap font-mono leading-relaxed">{streamingContent}</p>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </Card>
+
+        <Card className="p-4 border-border bg-card/80 backdrop-blur-sm border-t-2 border-t-primary/20">
+          <div className="flex gap-3">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Ask a follow-up question about this step..."
+              className="min-h-[80px] resize-none bg-background/50 border-border/50 font-mono text-sm focus:border-primary/50 transition-colors"
+              disabled={streaming}
+            />
+            <Button
+              onClick={sendMessage}
+              disabled={!input.trim() || streaming}
+              size="icon"
+              className="h-[80px] w-[80px] bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105"
+            >
+              {streaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            </Button>
+          </div>
+          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground font-mono">
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-2 py-1 bg-muted rounded text-[10px] border border-border">Enter</kbd>
+              to send
+            </span>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-2 py-1 bg-muted rounded text-[10px] border border-border">Shift+Enter</kbd>
+              for new line
+            </span>
+          </div>
+        </Card>
       </div>
     </Layout>
   );
