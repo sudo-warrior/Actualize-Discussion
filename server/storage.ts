@@ -15,6 +15,7 @@ export interface IStorage {
   findApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
   updateApiKeyLastUsed(id: string): Promise<void>;
   revokeApiKey(userId: string, id: string): Promise<boolean>;
+  saveStepGuidance(id: string, stepIndex: number, guidance: string): Promise<Incident | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -86,6 +87,15 @@ export class DatabaseStorage implements IStorage {
   async revokeApiKey(userId: string, id: string): Promise<boolean> {
     const result = await db.update(apiKeys).set({ revoked: true }).where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async saveStepGuidance(id: string, stepIndex: number, guidance: string): Promise<Incident | undefined> {
+    const incident = await this.getIncident(id);
+    if (!incident) return undefined;
+    const guidanceArray = incident.stepGuidance || [];
+    guidanceArray[stepIndex] = guidance;
+    const [updated] = await db.update(incidents).set({ stepGuidance: guidanceArray }).where(eq(incidents.id, id)).returning();
+    return updated;
   }
 }
 

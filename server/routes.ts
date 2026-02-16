@@ -148,13 +148,23 @@ export async function registerRoutes(
     if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= incident.nextSteps.length) {
       return res.status(400).json({ message: "Invalid step index" });
     }
+    
+    // Return cached guidance if available
+    if (incident.stepGuidance?.[stepIndex]) {
+      return res.json({ guidance: incident.stepGuidance[stepIndex], cached: true });
+    }
+    
     try {
       const guidance = await getStepGuidance(incident.nextSteps[stepIndex], {
         rootCause: incident.rootCause,
         fix: incident.fix,
         rawLogs: incident.rawLogs.slice(0, 2000),
       });
-      return res.json({ guidance });
+      
+      // Save guidance to DB
+      await storage.saveStepGuidance(req.params.id as string, stepIndex, guidance);
+      
+      return res.json({ guidance, cached: false });
     } catch (error) {
       console.error("Guidance error:", error);
       return res.status(500).json({ message: "Failed to generate guidance." });
