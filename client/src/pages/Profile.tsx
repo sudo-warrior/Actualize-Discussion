@@ -4,6 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Incident } from "@shared/schema";
@@ -48,6 +58,7 @@ export default function Profile() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [newKeyName, setNewKeyName] = useState("");
+  const [keyToRevoke, setKeyToRevoke] = useState<{ id: string; name: string } | null>(null);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
@@ -78,12 +89,13 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
       toast({ title: "API key revoked", description: "This key can no longer be used." });
+      setKeyToRevoke(null);
     },
   });
 
-  const handleRevokeKey = (keyId: string, keyName: string) => {
-    if (window.confirm(`Are you sure you want to revoke "${keyName}"? This action cannot be undone and the key will stop working immediately.`)) {
-      revokeKeyMutation.mutate(keyId);
+  const handleRevokeKey = () => {
+    if (keyToRevoke) {
+      revokeKeyMutation.mutate(keyToRevoke.id);
     }
   };
 
@@ -310,7 +322,7 @@ export default function Profile() {
                             data-testid={`button-revoke-key-${k.id}`}
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleRevokeKey(k.id, k.name)}
+                            onClick={() => setKeyToRevoke({ id: k.id, name: k.name })}
                             disabled={revokeKeyMutation.isPending}
                           className="h-7 w-7 text-muted-foreground hover:text-red-400"
                         >
@@ -368,6 +380,28 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!keyToRevoke} onOpenChange={(open) => !open && setKeyToRevoke(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to revoke <span className="font-mono font-semibold">"{keyToRevoke?.name}"</span>?
+              <br /><br />
+              This action cannot be undone and the key will stop working immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRevokeKey}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Revoke Key
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
