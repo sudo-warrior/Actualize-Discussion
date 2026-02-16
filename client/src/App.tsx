@@ -13,6 +13,7 @@ import IncidentDetail from "@/pages/IncidentDetail";
 import IncidentChat from "@/pages/IncidentChat";
 import ApiDocs from "@/pages/ApiDocs";
 import Landing from "@/pages/Landing";
+import Onboarding from "@/pages/Onboarding";
 import Login from "@/pages/Login";
 import { Loader2 } from "lucide-react";
 
@@ -32,7 +33,7 @@ function AuthenticatedRouter() {
 }
 
 function AppContent() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -45,15 +46,16 @@ function AppContent() {
     );
   }
 
-  return (
-    <Switch>
-      <Route path="/login" component={Login} />
-      <Route path="/landing" component={Landing} />
-      <Route>
-        {isAuthenticated ? <AuthenticatedRouter /> : <Landing />}
-      </Route>
-    </Switch>
-  );
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
+
+  // Check if user needs onboarding
+  if (!user?.firstName || !user?.username) {
+    return <Onboarding />;
+  }
+
+  return <AuthenticatedRouter />;
 }
 
 function App() {

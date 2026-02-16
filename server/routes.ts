@@ -299,6 +299,17 @@ export async function registerRoutes(
     return res.json({ success: true });
   });
 
+  // User profile
+  app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    
+    const { username, firstName, lastName, phone, dob } = req.body;
+    // In a real app, you'd update the user in your database
+    // For now, just return success (Supabase handles user metadata)
+    return res.json({ success: true });
+  });
+
   // === Developer API v1 (API key auth) ===
 
   app.post("/api/v1/incidents/analyze", apiKeyAuth, async (req: any, res) => {
