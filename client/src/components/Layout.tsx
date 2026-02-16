@@ -164,7 +164,7 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
             <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={() => { setMobileMenuOpen(false); window.location.href = "/profile"; }}>
+            <DropdownMenuItem onClick={() => window.location.href = "/profile"}>
               <Settings className="h-4 w-4 mr-2" />
               Profile & Settings
             </DropdownMenuItem>
