@@ -148,16 +148,16 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
       <div className="p-4 border-t border-border bg-card/30">
         <DropdownMenu>
           <DropdownMenuTrigger className="w-full flex items-center gap-3 hover:bg-muted/50 p-2 rounded-md transition-colors">
-            {user?.profileImageUrl ? (
-              <img src={user.profileImageUrl} alt="" className="h-8 w-8 rounded border border-primary/30 object-cover" />
+            {user?.user_metadata?.profileImageUrl ? (
+              <img src={user.user_metadata.profileImageUrl} alt="" className="h-8 w-8 rounded border border-primary/30 object-cover" />
             ) : (
               <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center border border-primary/30 text-primary font-bold text-xs">
-                {(user?.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                {(user?.user_metadata?.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}
               </div>
             )}
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-medium truncate">
-                {user?.firstName ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}` : user?.email || "Operator"}
+                {user?.user_metadata?.firstName ? `${user.user_metadata.firstName}${user.user_metadata.lastName ? ` ${user.user_metadata.lastName}` : ""}` : user?.email || "Operator"}
               </p>
               <p className="text-xs text-muted-foreground truncate">{user?.email || "System Admin"}</p>
             </div>

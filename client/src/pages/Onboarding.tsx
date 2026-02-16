@@ -4,13 +4,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Terminal, Sparkles, User } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { Terminal, Sparkles } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Onboarding() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     username: "",
     firstName: "",
@@ -26,10 +28,29 @@ export default function Onboarding() {
 
     setLoading(true);
     try {
-      await apiRequest("PATCH", "/api/user/profile", formData);
-      navigate("/");
-    } catch (error) {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          username: formData.username,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          dob: formData.dob,
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast({ title: "Profile updated!", description: "Welcome to Incident Command" });
+      
+      // Reload to refresh user data
+      window.location.href = "/";
+    } catch (error: any) {
       console.error("Failed to update profile:", error);
+      toast({ 
+        title: "Update failed", 
+        description: error.message || "Please try again",
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }

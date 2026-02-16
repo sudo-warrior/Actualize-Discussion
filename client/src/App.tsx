@@ -51,7 +51,7 @@ function AppContent() {
   }
 
   // Check if user needs onboarding
-  if (!user?.firstName || !user?.username) {
+  if (!user?.user_metadata?.firstName || !user?.user_metadata?.username) {
     return <Onboarding />;
   }
 

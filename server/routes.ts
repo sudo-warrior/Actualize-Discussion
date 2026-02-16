@@ -305,9 +305,25 @@ export async function registerRoutes(
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
     
     const { username, firstName, lastName, phone, dob } = req.body;
-    // In a real app, you'd update the user in your database
-    // For now, just return success (Supabase handles user metadata)
-    return res.json({ success: true });
+    
+    try {
+      const { supabase } = await import("./supabase");
+      const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          username,
+          firstName,
+          lastName,
+          phone,
+          dob
+        }
+      });
+      
+      if (error) throw error;
+      return res.json({ success: true, user: data.user });
+    } catch (error) {
+      console.error("Profile update error:", error);
+      return res.status(500).json({ message: "Failed to update profile" });
+    }
   });
 
   // === Developer API v1 (API key auth) ===
