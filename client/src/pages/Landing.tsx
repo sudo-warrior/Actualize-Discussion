@@ -10,6 +10,7 @@ import {
   Lock,
   Search
 } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Landing() {
   return (
@@ -23,12 +24,12 @@ export default function Landing() {
             <Terminal className="h-5 w-5" />
             <span className="font-bold text-lg tracking-tight">INCIDENT<span className="text-muted-foreground">.CMD</span></span>
           </div>
-          <a href="/api/login">
+          <Link href="/login">
             <Button data-testid="button-login" className="bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-sm shadow-[0_0_15px_-3px_hsl(var(--primary))]">
               <Lock className="mr-2 h-3.5 w-3.5" />
               SIGN IN
             </Button>
-          </a>
+          </Link>
         </div>
       </nav>
 
@@ -50,12 +51,12 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <a href="/api/login">
+            <Link href="/login">
               <Button data-testid="button-get-started" size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold tracking-wide h-14 px-8 text-base shadow-[0_0_30px_-5px_hsl(var(--primary))]">
                 GET STARTED
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-            </a>
+            </Link>
           </div>
 
           <div className="flex items-center justify-center gap-6 mt-6 text-xs text-muted-foreground font-mono">

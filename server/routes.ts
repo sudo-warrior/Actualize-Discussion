@@ -3,14 +3,12 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeLogsSchema } from "@shared/schema";
 import { analyzeLogs, getStepGuidance } from "./analyzer";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { isAuthenticated } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await setupAuth(app);
-  registerAuthRoutes(app);
 
   app.post("/api/incidents/analyze", isAuthenticated, async (req: any, res) => {
     try {
@@ -19,7 +17,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: parsed.error.errors[0].message });
       }
 
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -48,7 +46,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/incidents", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -61,7 +59,7 @@ export async function registerRoutes(
     if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
     }
-    const userId = req.user?.claims?.sub;
+    const userId = req.user?.id;
     if (incident.userId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -73,7 +71,7 @@ export async function registerRoutes(
     if (!["analyzing", "resolved", "critical"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
-    const userId = req.user?.claims?.sub;
+    const userId = req.user?.id;
     const incident = await storage.getIncident(req.params.id as string);
     if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
@@ -86,7 +84,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/incidents/:id/steps/:stepIndex", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -106,7 +104,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/incidents/:id/steps/:stepIndex/guidance", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -135,7 +133,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/incidents/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -151,7 +149,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/incidents/stats/summary", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }

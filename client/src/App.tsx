@@ -11,6 +11,7 @@ import History from "@/pages/History";
 import Profile from "@/pages/Profile";
 import IncidentDetail from "@/pages/IncidentDetail";
 import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
 import { Loader2 } from "lucide-react";
 
 function AuthenticatedRouter() {
@@ -40,11 +41,15 @@ function AppContent() {
     );
   }
 
-  if (!isAuthenticated) {
-    return <Landing />;
-  }
-
-  return <AuthenticatedRouter />;
+  return (
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route path="/landing" component={Landing} />
+      <Route>
+        {isAuthenticated ? <AuthenticatedRouter /> : <Landing />}
+      </Route>
+    </Switch>
+  );
 }
 
 function App() {

@@ -3,7 +3,6 @@ import { pgTable, text, varchar, integer, timestamp } from "drizzle-orm/pg-core"
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export * from "./models/auth";
 export * from "./models/chat";
 
 export const incidents = pgTable("incidents", {
