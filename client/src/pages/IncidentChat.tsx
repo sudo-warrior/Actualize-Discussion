@@ -131,47 +131,48 @@ export default function IncidentChat() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-4">
-        <Card className="p-4 border-border bg-gradient-to-r from-card via-card to-primary/5 border-l-4 border-l-primary">
-          <div className="flex items-center gap-3">
+      <div className="max-w-5xl mx-auto space-y-4 p-4 md:p-0">
+        <Card className="p-3 md:p-4 border-border bg-gradient-to-r from-card via-card to-primary/5 border-l-4 border-l-primary">
+          <div className="flex items-center gap-2 md:gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate(`/incidents/${incidentId}`)}
-              className="h-9 w-9 hover:bg-primary/10"
+              className="h-8 w-8 md:h-9 md:w-9 hover:bg-primary/10 shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="h-10 w-10 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-primary" />
+            <div className="h-8 w-8 md:h-10 md:w-10 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-primary" />
             </div>
-            <div className="flex-1">
-              <h1 className="text-lg font-bold font-mono flex items-center gap-2">
-                <Terminal className="h-4 w-4 text-primary" />
-                AI Guidance Assistant
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm md:text-lg font-bold font-mono flex items-center gap-2">
+                <Terminal className="h-3 w-3 md:h-4 md:w-4 text-primary" />
+                <span className="hidden sm:inline">AI Guidance Assistant</span>
+                <span className="sm:hidden">AI Assistant</span>
               </h1>
               {stepIndex && incident && (
-                <p className="text-xs text-muted-foreground font-mono mt-1 flex items-center gap-2">
-                  <Zap className="h-3 w-3" />
-                  Step {parseInt(stepIndex) + 1}: {incident.nextSteps[parseInt(stepIndex)]?.slice(0, 80)}...
+                <p className="text-[10px] md:text-xs text-muted-foreground font-mono mt-1 flex items-center gap-1 md:gap-2 truncate">
+                  <Zap className="h-2 w-2 md:h-3 md:w-3 shrink-0" />
+                  <span className="truncate">Step {parseInt(stepIndex) + 1}: {incident.nextSteps[parseInt(stepIndex)]?.slice(0, 40)}...</span>
                 </p>
               )}
             </div>
-            <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary">
-              Live Chat
+            <Badge variant="outline" className="font-mono text-[10px] md:text-xs border-primary/30 text-primary shrink-0">
+              Live
             </Badge>
           </div>
         </Card>
 
         <Card className="p-0 border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-          <div className="h-[calc(100vh-320px)] overflow-y-auto px-6 py-6 space-y-4 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+          <div className="h-[calc(100vh-280px)] md:h-[calc(100vh-320px)] overflow-y-auto px-3 md:px-6 py-4 md:py-6 space-y-3 md:space-y-4 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
             {messages.length === 0 && !streaming && (
               <div className="flex items-center justify-center h-full text-center">
                 <div className="space-y-3">
-                  <div className="h-16 w-16 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto">
-                    <Sparkles className="h-8 w-8 text-primary" />
+                  <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto">
+                    <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-primary" />
                   </div>
-                  <p className="text-sm text-muted-foreground font-mono">
+                  <p className="text-xs md:text-sm text-muted-foreground font-mono px-4">
                     Ask me anything about this remediation step
                   </p>
                 </div>
@@ -184,20 +185,20 @@ export default function IncidentChat() {
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg p-4 ${
+                  className={`max-w-[90%] md:max-w-[80%] rounded-lg p-3 md:p-4 ${
                     msg.role === "user"
                       ? "bg-primary/90 text-primary-foreground border border-primary shadow-lg shadow-primary/20"
                       : "bg-muted/80 border border-border/50 backdrop-blur-sm"
                   }`}
                 >
                   {msg.role === "assistant" && (
-                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/30">
-                      <Sparkles className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
+                    <div className="flex items-center gap-2 mb-2 md:mb-3 pb-2 border-b border-border/30">
+                      <Sparkles className="h-3 w-3 md:h-3.5 md:w-3.5 text-primary" />
+                      <span className="text-[10px] md:text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
                     </div>
                   )}
-                  <p className="text-sm whitespace-pre-wrap font-mono leading-relaxed">{msg.content}</p>
-                  <p className="text-[10px] text-muted-foreground/60 font-mono mt-2">
+                  <p className="text-xs md:text-sm whitespace-pre-wrap font-mono leading-relaxed break-words">{msg.content}</p>
+                  <p className="text-[9px] md:text-[10px] text-muted-foreground/60 font-mono mt-2">
                     {new Date(msg.createdAt).toLocaleTimeString()}
                   </p>
                 </div>
@@ -206,13 +207,13 @@ export default function IncidentChat() {
 
             {streaming && streamingContent && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-lg p-4 bg-muted/80 border border-border/50 backdrop-blur-sm">
-                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/30">
-                    <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
-                    <span className="text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
+                <div className="max-w-[90%] md:max-w-[80%] rounded-lg p-3 md:p-4 bg-muted/80 border border-border/50 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-2 md:mb-3 pb-2 border-b border-border/30">
+                    <Sparkles className="h-3 w-3 md:h-3.5 md:w-3.5 text-primary animate-pulse" />
+                    <span className="text-[10px] md:text-xs font-mono uppercase tracking-wider text-primary">AI Assistant</span>
                     <Loader2 className="h-3 w-3 animate-spin text-primary ml-auto" />
                   </div>
-                  <p className="text-sm whitespace-pre-wrap font-mono leading-relaxed">{streamingContent}</p>
+                  <p className="text-xs md:text-sm whitespace-pre-wrap font-mono leading-relaxed break-words">{streamingContent}</p>
                 </div>
               </div>
             )}
@@ -221,8 +222,8 @@ export default function IncidentChat() {
           </div>
         </Card>
 
-        <Card className="p-4 border-border bg-card/80 backdrop-blur-sm border-t-2 border-t-primary/20">
-          <div className="flex gap-3">
+        <Card className="p-3 md:p-4 border-border bg-card/80 backdrop-blur-sm border-t-2 border-t-primary/20">
+          <div className="flex gap-2 md:gap-3">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -232,27 +233,27 @@ export default function IncidentChat() {
                   sendMessage();
                 }
               }}
-              placeholder="Ask a follow-up question about this step..."
-              className="min-h-[80px] resize-none bg-background/50 border-border/50 font-mono text-sm focus:border-primary/50 transition-colors"
+              placeholder="Ask a follow-up question..."
+              className="min-h-[60px] md:min-h-[80px] resize-none bg-background/50 border-border/50 font-mono text-xs md:text-sm focus:border-primary/50 transition-colors"
               disabled={streaming}
             />
             <Button
               onClick={sendMessage}
               disabled={!input.trim() || streaming}
               size="icon"
-              className="h-[80px] w-[80px] bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105"
+              className="h-[60px] w-[60px] md:h-[80px] md:w-[80px] bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105 shrink-0"
             >
-              {streaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+              {streaming ? <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" /> : <Send className="h-4 w-4 md:h-5 md:w-5" />}
             </Button>
           </div>
-          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground font-mono">
-            <span className="flex items-center gap-1.5">
-              <kbd className="px-2 py-1 bg-muted rounded text-[10px] border border-border">Enter</kbd>
-              to send
+          <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-3 text-[10px] md:text-xs text-muted-foreground font-mono flex-wrap">
+            <span className="flex items-center gap-1 md:gap-1.5">
+              <kbd className="px-1.5 md:px-2 py-0.5 md:py-1 bg-muted rounded text-[9px] md:text-[10px] border border-border">Enter</kbd>
+              <span className="hidden sm:inline">to send</span>
             </span>
-            <span className="flex items-center gap-1.5">
-              <kbd className="px-2 py-1 bg-muted rounded text-[10px] border border-border">Shift+Enter</kbd>
-              for new line
+            <span className="flex items-center gap-1 md:gap-1.5">
+              <kbd className="px-1.5 md:px-2 py-0.5 md:py-1 bg-muted rounded text-[9px] md:text-[10px] border border-border">Shift+Enter</kbd>
+              <span className="hidden sm:inline">for new line</span>
             </span>
           </div>
         </Card>
