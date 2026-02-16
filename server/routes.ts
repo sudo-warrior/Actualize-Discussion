@@ -41,7 +41,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   // Register chat routes
-  registerChatRoutes(app);
+  registerChatRoutes(app, isAuthenticated);
 
   app.post("/api/incidents/analyze", isAuthenticated, async (req: any, res) => {
     try {

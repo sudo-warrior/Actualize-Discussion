@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
 import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,22 +53,20 @@ export default function IncidentChat() {
   // Create conversation on mount
   useEffect(() => {
     if (incident && !conversationId) {
-      const title = stepIndex 
-        ? `Follow-up: ${incident.nextSteps[parseInt(stepIndex)]?.slice(0, 50)}...`
-        : `Chat about: ${incident.title}`;
-      
-      fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
+      const createConversation = async () => {
+        const title = stepIndex 
+          ? `Follow-up: ${incident.nextSteps[parseInt(stepIndex)]?.slice(0, 50)}...`
+          : `Chat about: ${incident.title}`;
+        
+        const res = await apiRequest("POST", "/api/conversations", { 
           title,
           incidentId: incident.id,
           stepIndex: stepIndex ? parseInt(stepIndex) : null
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => setConversationId(data.id));
+        });
+        const data = await res.json();
+        setConversationId(data.id);
+      };
+      createConversation();
     }
   }, [incident, conversationId, stepIndex]);
 
@@ -83,10 +83,15 @@ export default function IncidentChat() {
     setStreamingContent("");
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ content: userMessage }),
       });
 
