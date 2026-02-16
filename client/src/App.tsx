@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import History from "@/pages/History";
 import Profile from "@/pages/Profile";
 import IncidentDetail from "@/pages/IncidentDetail";
+import IncidentChat from "@/pages/IncidentChat";
 import ApiDocs from "@/pages/ApiDocs";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -23,6 +24,7 @@ function AuthenticatedRouter() {
       <Route path="/history" component={History} />
       <Route path="/profile" component={Profile} />
       <Route path="/docs" component={ApiDocs} />
+      <Route path="/incidents/:id/chat" component={IncidentChat} />
       <Route path="/incidents/:id" component={IncidentDetail} />
       <Route component={NotFound} />
     </Switch>

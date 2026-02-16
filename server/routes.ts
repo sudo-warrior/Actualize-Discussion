@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { analyzeLogsSchema } from "@shared/schema";
 import { analyzeLogs, getStepGuidance } from "./analyzer";
 import { isAuthenticated } from "./auth";
+import { registerChatRoutes } from "./replit_integrations/chat";
 
 function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
@@ -38,6 +39,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  
+  // Register chat routes
+  registerChatRoutes(app);
 
   app.post("/api/incidents/analyze", isAuthenticated, async (req: any, res) => {
     try {
