@@ -27,7 +27,8 @@ import {
   Sparkles,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MessageSquare
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -361,9 +362,22 @@ export default function IncidentDetail() {
                                   <span>Generating step-by-step instructions...</span>
                                 </div>
                               ) : (
-                                <div className="text-xs text-foreground leading-relaxed whitespace-pre-wrap font-mono">
-                                  {guidanceData[i]}
-                                </div>
+                                <>
+                                  <div className="max-h-[400px] overflow-y-auto text-xs text-foreground leading-relaxed whitespace-pre-wrap font-mono pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+                                    {guidanceData[i]}
+                                  </div>
+                                  <div className="mt-3 pt-3 border-t border-border/50">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full text-xs font-mono"
+                                      onClick={() => navigate(`/incidents/${incidentId}/chat?step=${i}`)}
+                                    >
+                                      <MessageSquare className="h-3 w-3 mr-2" />
+                                      Ask Follow-up Questions
+                                    </Button>
+                                  </div>
+                                </>
                               )}
                             </div>
                           </motion.div>
