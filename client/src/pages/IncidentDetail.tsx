@@ -57,9 +57,25 @@ export default function IncidentDetail() {
       const res = await apiRequest("PATCH", `/api/incidents/${incidentId}/steps/${stepIndex}`);
       return res.json() as Promise<Incident>;
     },
-    onSuccess: () => {
+    onSuccess: (updatedIncident) => {
       queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
+      
+      // Auto-update status based on completion
+      const completedCount = updatedIncident.completedSteps?.length || 0;
+      const totalSteps = updatedIncident.nextSteps.length;
+      
+      if (completedCount === totalSteps && updatedIncident.status !== "resolved") {
+        // All steps completed, mark as resolved
+        statusMutation.mutate("resolved");
+        toast({ 
+          title: "All steps completed!", 
+          description: "Incident marked as resolved." 
+        });
+      } else if (completedCount > 0 && updatedIncident.status === "resolved") {
+        // Steps uncompleted, revert to analyzing
+        statusMutation.mutate("analyzing");
+      }
     },
   });
 
@@ -366,7 +382,21 @@ export default function IncidentDetail() {
                                   <div className="max-h-[400px] overflow-y-auto text-xs text-foreground leading-relaxed whitespace-pre-wrap font-mono pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
                                     {guidanceData[i]}
                                   </div>
-                                  <div className="mt-3 pt-3 border-t border-border/50">
+                                  <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                                    {!isDone && (
+                                      <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="w-full text-xs font-mono bg-emerald-600 hover:bg-emerald-700"
+                                        onClick={() => {
+                                          toggleStepMutation.mutate(i);
+                                          toast({ title: "Step marked as complete!" });
+                                        }}
+                                      >
+                                        <CheckCircle2 className="h-3 w-3 mr-2" />
+                                        Mark Step as Complete
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="outline"
                                       size="sm"
