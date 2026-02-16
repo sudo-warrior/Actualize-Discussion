@@ -3,6 +3,16 @@ import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -41,6 +51,7 @@ export default function IncidentDetail() {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [guidanceData, setGuidanceData] = useState<Record<number, string>>({});
   const [loadingGuidance, setLoadingGuidance] = useState<number | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<Incident>({
     queryKey: [`/api/incidents/${incidentId}`],
@@ -450,11 +461,7 @@ export default function IncidentDetail() {
             <Button
               data-testid="button-delete-incident"
               variant="outline"
-              onClick={() => {
-                if (confirm("Are you sure you want to delete this incident?")) {
-                  deleteMutation.mutate();
-                }
-              }}
+              onClick={() => setShowDeleteDialog(true)}
               className="w-full text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400 font-mono text-xs"
               disabled={deleteMutation.isPending}
             >
@@ -464,6 +471,31 @@ export default function IncidentDetail() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Incident</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this incident?
+              <br /><br />
+              This action cannot be undone. All incident data, analysis, and history will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteMutation.mutate();
+                setShowDeleteDialog(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Incident
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
