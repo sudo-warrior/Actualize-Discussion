@@ -36,7 +36,7 @@ async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
   const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
 
   let currentCount = apiKey.requestCount;
-  
+
   // Reset if 24 hours passed
   if (hoursSinceReset >= 24) {
     currentCount = 0;
@@ -44,7 +44,7 @@ async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
 
   if (currentCount >= DAILY_LIMIT) {
     const hoursUntilReset = Math.ceil(24 - hoursSinceReset);
-    return res.status(429).json({ 
+    return res.status(429).json({
       error: "Rate limit exceeded. You have reached the daily limit of 100 requests.",
       limit: DAILY_LIMIT,
       remaining: 0,
@@ -68,7 +68,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
   // Register chat routes
   registerChatRoutes(app, isAuthenticated);
 
@@ -141,13 +141,13 @@ export async function registerRoutes(
     if (incident.userId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
-    
+
     // Auto-complete all steps when marking as resolved
     if (status === "resolved" && incident.nextSteps.length > 0) {
       const allSteps = Array.from({ length: incident.nextSteps.length }, (_, i) => i);
       await storage.completeAllSteps(req.params.id as string, allSteps);
     }
-    
+
     const updated = await storage.updateIncidentStatus(req.params.id as string, status);
     return res.json(updated);
   });
@@ -188,22 +188,22 @@ export async function registerRoutes(
     if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= incident.nextSteps.length) {
       return res.status(400).json({ message: "Invalid step index" });
     }
-    
+
     // Return cached guidance if available
     if (incident.stepGuidance?.[stepIndex]) {
       return res.json({ guidance: incident.stepGuidance[stepIndex], cached: true });
     }
-    
+
     try {
       const guidance = await getStepGuidance(incident.nextSteps[stepIndex], {
         rootCause: incident.rootCause,
         fix: incident.fix,
         rawLogs: incident.rawLogs.slice(0, 2000),
       });
-      
+
       // Save guidance to DB
       await storage.saveStepGuidance(req.params.id as string, stepIndex, guidance);
-      
+
       return res.json({ guidance, cached: false });
     } catch (error) {
       console.error("Guidance error:", error);
@@ -341,9 +341,9 @@ export async function registerRoutes(
   app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
     const userId = req.user.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
-    
+
     const { username, firstName, lastName, phone, dob } = req.body;
-    
+
     try {
       const { supabase } = await import("./supabase");
       const { data, error } = await supabase.auth.admin.updateUserById(userId, {
@@ -355,7 +355,7 @@ export async function registerRoutes(
           dob
         }
       });
-      
+
       if (error) throw error;
       return res.json({ success: true, user: data.user });
     } catch (error) {
@@ -515,14 +515,17 @@ export async function registerRoutes(
     try {
       const { generateIncidentPDF } = await import("./foxit-pdf");
       const pdfBuffer = await generateIncidentPDF(incident);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="incident-${incident.id}.pdf"`);
       res.setHeader('Content-Length', pdfBuffer.length);
       return res.send(pdfBuffer);
-    } catch (error) {
+    } catch (error: any) {
       console.error("PDF generation error:", error);
-      return res.status(500).json({ message: "Failed to generate PDF" });
+      const message = error.message.includes('not configured')
+        ? "PDF Export is not configured on the server."
+        : "Failed to generate PDF report.";
+      return res.status(500).json({ message });
     }
   });
 
@@ -530,7 +533,7 @@ export async function registerRoutes(
   app.post("/api/incidents/export/bulk", isAuthenticated, async (req: any, res) => {
     const userId = req.user.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
-    
+
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "Incident IDs required" });
@@ -540,25 +543,28 @@ export async function registerRoutes(
       const incidents = await Promise.all(
         ids.map(id => storage.getIncident(id))
       );
-      
+
       const validIncidents = incidents.filter(
         inc => inc && inc.userId === userId
       ) as Incident[];
-      
+
       if (validIncidents.length === 0) {
         return res.status(404).json({ message: "No valid incidents found" });
       }
 
       const { mergeIncidentPDFs } = await import("./foxit-pdf");
       const pdfBuffer = await mergeIncidentPDFs(validIncidents);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="incidents-report-${Date.now()}.pdf"`);
       res.setHeader('Content-Length', pdfBuffer.length);
       return res.send(pdfBuffer);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Bulk PDF error:", error);
-      return res.status(500).json({ message: "Failed to generate bulk PDF" });
+      const message = error.message.includes('not configured')
+        ? "PDF Export is not configured on the server."
+        : "Failed to generate bulk PDF report.";
+      return res.status(500).json({ message });
     }
   });
 
@@ -596,10 +602,10 @@ export async function registerRoutes(
 
   app.get("/api/v1/incidents", apiKeyAuth, async (req: any, res) => {
     const incidents = await storage.getIncidentsByUser(req.apiUserId);
-    return res.json({ 
+    return res.json({
       success: true,
-      data: incidents, 
-      total: incidents.length 
+      data: incidents,
+      total: incidents.length
     });
   });
 
@@ -633,7 +639,7 @@ export async function registerRoutes(
     if (!incident) return res.status(404).json({ error: "Incident not found." });
     if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
     await storage.deleteIncident(req.params.id as string);
-    return res.json({ 
+    return res.json({
       success: true,
       message: "Incident deleted successfully"
     });

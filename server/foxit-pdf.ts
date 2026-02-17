@@ -2,12 +2,67 @@ import axios from 'axios';
 import FormData from 'form-data';
 import type { Incident } from '@shared/schema';
 
-const FOXIT_API_KEY = process.env.FOXIT_API_KEY || '';
-const FOXIT_API_SECRET = process.env.FOXIT_API_SECRET || '';
-const FOXIT_BASE_URL = 'https://api.foxit.com/v1';
+const FOXIT_API_KEY = (process.env.FOXIT_API_KEY || '').trim();
+const FOXIT_API_SECRET = (process.env.FOXIT_API_SECRET || '').trim();
+const FOXIT_BASE_URL = 'https://na1.fusion.foxit.com';
+
+// Helper for Foxit Fusion Auth Headers
+const getHeaders = (extra = {}) => ({
+  'client_id': FOXIT_API_KEY,
+  'client_secret': FOXIT_API_SECRET,
+  ...extra
+});
+
+// Helper to poll task status
+async function pollTask(taskId: string): Promise<string> {
+  const maxRetries = 30; // 60 seconds total with 2s interval
+  let retries = 0;
+
+  while (retries < maxRetries) {
+    const response = await axios.get(`${FOXIT_BASE_URL}/pdf-services/api/tasks/${taskId}`, {
+      headers: getHeaders()
+    });
+
+    const { status, resultDocumentId, errorTitle, errorDetail } = response.data;
+
+    if (status === 'COMPLETED') return resultDocumentId;
+    if (status === 'FAILED') {
+      throw new Error(`Foxit Task Failed: ${errorTitle || 'Unknown Error'} - ${errorDetail || ''}`);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    retries++;
+  }
+  throw new Error('Foxit Task Timeout');
+}
+
+// Helper to download document
+async function downloadDocument(documentId: string): Promise<Buffer> {
+  const response = await axios.get(`${FOXIT_BASE_URL}/pdf-services/api/documents/${documentId}/download`, {
+    headers: getHeaders(),
+    responseType: 'arraybuffer'
+  });
+  return Buffer.from(response.data);
+}
+
+// Helper to upload document
+async function uploadDocument(pdfBuffer: Buffer, filename: string): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', pdfBuffer, { filename });
+
+  const response = await axios.post(`${FOXIT_BASE_URL}/pdf-services/api/documents/upload`, formData, {
+    headers: getHeaders(formData.getHeaders())
+  });
+
+  return response.data.documentId;
+}
 
 // Generate PDF using Foxit Document Generation API
 export async function generateIncidentPDF(incident: Incident): Promise<Buffer> {
+  if (!FOXIT_API_KEY || !FOXIT_API_SECRET) {
+    throw new Error('Foxit API credentials (FOXIT_API_KEY, FOXIT_API_SECRET) are not configured.');
+  }
+
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -60,11 +115,11 @@ export async function generateIncidentPDF(incident: Incident): Promise<Buffer> {
   <div class="section">
     <h2>✅ Steps</h2>
     ${incident.nextSteps.map((step, i) => {
-      const completed = (incident.completedSteps || []).includes(i);
-      return `<div class="step ${completed ? 'completed' : ''}">
+    const completed = (incident.completedSteps || []).includes(i);
+    return `<div class="step ${completed ? 'completed' : ''}">
         ${completed ? '☑' : '☐'} <strong>Step ${i + 1}:</strong> ${step}
       </div>`;
-    }).join('')}
+  }).join('')}
   </div>
 
   <div class="footer">
@@ -75,147 +130,97 @@ export async function generateIncidentPDF(incident: Incident): Promise<Buffer> {
 </html>`;
 
   try {
-    // Step 1: Generate PDF from HTML using Foxit Document Generation API
-    const response = await axios.post(
-      `${FOXIT_BASE_URL}/document/generate`,
+    // Step 1: Submit HTML to PDF task
+    const submitResponse = await axios.post(
+      `${FOXIT_BASE_URL}/pdf-services/api/documents/create/pdf-from-html`,
       { html: htmlContent, options: { format: 'A4', printBackground: true } },
-      {
-        headers: {
-          'Authorization': `Bearer ${FOXIT_API_KEY}`,
-          'X-API-Secret': FOXIT_API_SECRET,
-          'Content-Type': 'application/json'
-        },
-        responseType: 'arraybuffer'
-      }
+      { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
-    
-    let pdfBuffer = Buffer.from(response.data);
-    
-    // Step 2: Enhance PDF using Foxit PDF Services API
-    // Add watermark
+
+    const docId = await pollTask(submitResponse.data.taskId);
+    let pdfBuffer = await downloadDocument(docId);
+
+    // Step 2: Add Watermark (Async)
     pdfBuffer = await addWatermark(pdfBuffer, 'CONFIDENTIAL');
-    
-    // Make searchable
+
+    // Step 3: OCR (Async)
     pdfBuffer = await makeSearchable(pdfBuffer);
-    
+
     return pdfBuffer;
   } catch (error: any) {
-    console.error('Foxit API error:', error.response?.data || error.message);
-    return generateFallbackPDF(incident);
+    const errorData = error.response?.data
+      ? JSON.stringify(error.response.data, null, 2)
+      : error.message;
+    console.error('Foxit API error:', errorData);
+    throw new Error(`PDF generation failed: ${errorData}`);
   }
 }
 
-// Add watermark using Foxit PDF Services API
 async function addWatermark(pdfBuffer: Buffer, text: string): Promise<Buffer> {
   try {
-    const formData = new FormData();
-    formData.append('file', pdfBuffer, 'incident.pdf');
-    formData.append('watermark', JSON.stringify({
-      text,
-      opacity: 0.3,
-      rotation: 45,
-      fontSize: 48,
-      color: '#cccccc'
-    }));
-    
-    const response = await axios.post(
-      `${FOXIT_BASE_URL}/pdf/watermark`,
-      formData,
+    const documentId = await uploadDocument(pdfBuffer, 'incident.pdf');
+
+    const submitResponse = await axios.post(
+      `${FOXIT_BASE_URL}/pdf-services/api/documents/enhance/pdf-watermark`,
       {
-        headers: {
-          'Authorization': `Bearer ${FOXIT_API_KEY}`,
-          'X-API-Secret': FOXIT_API_SECRET,
-          ...formData.getHeaders()
-        },
-        responseType: 'arraybuffer'
-      }
+        documentId,
+        watermark: {
+          text,
+          opacity: 0.3,
+          rotation: 45,
+          fontSize: 48,
+          color: '#cccccc'
+        }
+      },
+      { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
-    
-    return Buffer.from(response.data);
+
+    const resultDocId = await pollTask(submitResponse.data.taskId);
+    return await downloadDocument(resultDocId);
   } catch (error) {
     console.error('Watermark error:', error);
     return pdfBuffer;
   }
 }
 
-// Make PDF searchable using Foxit OCR
 async function makeSearchable(pdfBuffer: Buffer): Promise<Buffer> {
   try {
-    const formData = new FormData();
-    formData.append('file', pdfBuffer, 'incident.pdf');
-    formData.append('language', 'en');
-    
-    const response = await axios.post(
-      `${FOXIT_BASE_URL}/pdf/ocr`,
-      formData,
-      {
-        headers: {
-          'Authorization': `Bearer ${FOXIT_API_KEY}`,
-          'X-API-Secret': FOXIT_API_SECRET,
-          ...formData.getHeaders()
-        },
-        responseType: 'arraybuffer'
-      }
+    const documentId = await uploadDocument(pdfBuffer, 'incident.pdf');
+
+    const submitResponse = await axios.post(
+      `${FOXIT_BASE_URL}/pdf-services/api/documents/analyze/pdf-ocr`,
+      { documentId, language: 'en' },
+      { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
-    
-    return Buffer.from(response.data);
+
+    const resultDocId = await pollTask(submitResponse.data.taskId);
+    return await downloadDocument(resultDocId);
   } catch (error) {
     console.error('OCR error:', error);
     return pdfBuffer;
   }
 }
 
-// Merge multiple incident PDFs
 export async function mergeIncidentPDFs(incidents: Incident[]): Promise<Buffer> {
   try {
-    const formData = new FormData();
-    
-    // Generate PDFs for each incident
-    for (let i = 0; i < incidents.length; i++) {
-      const pdfBuffer = await generateIncidentPDF(incidents[i]);
-      formData.append('files', pdfBuffer, `incident-${i}.pdf`);
+    const documentIds: string[] = [];
+    for (const incident of incidents) {
+      const pdfBuffer = await generateIncidentPDF(incident);
+      const docId = await uploadDocument(pdfBuffer, `incident-${incident.id}.pdf`);
+      documentIds.push(docId);
     }
-    
-    const response = await axios.post(
-      `${FOXIT_BASE_URL}/pdf/merge`,
-      formData,
-      {
-        headers: {
-          'Authorization': `Bearer ${FOXIT_API_KEY}`,
-          'X-API-Secret': FOXIT_API_SECRET,
-          ...formData.getHeaders()
-        },
-        responseType: 'arraybuffer'
-      }
+
+    const submitResponse = await axios.post(
+      `${FOXIT_BASE_URL}/pdf-services/api/documents/enhance/pdf-combine`,
+      { documentIds },
+      { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
-    
-    return Buffer.from(response.data);
+
+    const resultDocId = await pollTask(submitResponse.data.taskId);
+    return await downloadDocument(resultDocId);
   } catch (error: any) {
-    console.error('Merge error:', error.response?.data || error.message);
+    console.error('Merge error:', error.message);
     throw new Error('Failed to merge PDFs');
   }
 }
 
-async function generateFallbackPDF(incident: Incident): Promise<Buffer> {
-  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595, 842]);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  
-  let y = 800;
-  page.drawText('INCIDENT REPORT', { x: 50, y, size: 24, font: boldFont, color: rgb(0.15, 0.38, 0.92) });
-  y -= 40;
-  page.drawText(incident.title, { x: 50, y, size: 16, font: boldFont });
-  y -= 30;
-  page.drawText(`Severity: ${incident.severity.toUpperCase()}`, { x: 50, y, size: 12, font });
-  y -= 20;
-  page.drawText(`Confidence: ${incident.confidence}%`, { x: 50, y, size: 12, font });
-  y -= 30;
-  page.drawText('ROOT CAUSE', { x: 50, y, size: 14, font: boldFont });
-  y -= 20;
-  page.drawText(incident.rootCause.substring(0, 200), { x: 50, y, size: 10, font, maxWidth: 500 });
-  
-  const pdfBytes = await pdfDoc.save();
-  return Buffer.from(pdfBytes);
-}

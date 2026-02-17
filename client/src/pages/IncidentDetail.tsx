@@ -75,17 +75,17 @@ export default function IncidentDetail() {
     onSuccess: (updatedIncident) => {
       queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
-      
+
       // Auto-update status based on completion
       const completedCount = updatedIncident.completedSteps?.length || 0;
       const totalSteps = updatedIncident.nextSteps.length;
-      
+
       if (completedCount === totalSteps && updatedIncident.status !== "resolved") {
         // All steps completed, mark as resolved
         statusMutation.mutate("resolved");
-        toast({ 
-          title: "All steps completed!", 
-          description: "Incident marked as resolved." 
+        toast({
+          title: "All steps completed!",
+          description: "Incident marked as resolved."
         });
       } else if (completedCount > 0 && updatedIncident.status === "resolved") {
         // Steps uncompleted, revert to analyzing
@@ -447,13 +447,12 @@ export default function IncidentDetail() {
                     key={s}
                     data-testid={`button-status-${s}`}
                     onClick={() => statusMutation.mutate(s)}
-                    className={`w-full text-left px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider transition-colors border ${
-                      incident.status === s
+                    className={`w-full text-left px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider transition-colors border ${incident.status === s
                         ? s === "resolved" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
                           : s === "critical" ? "bg-red-500/20 border-red-500/30 text-red-400"
-                          : "bg-blue-500/20 border-blue-500/30 text-blue-400"
+                            : "bg-blue-500/20 border-blue-500/30 text-blue-400"
                         : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     {s === "resolved" && <CheckCircle2 className="h-3 w-3 inline mr-2" />}
                     {s === "critical" && <AlertTriangle className="h-3 w-3 inline mr-2" />}
@@ -495,7 +494,12 @@ export default function IncidentDetail() {
                     const res = await fetch(`/api/incidents/${incident.id}/export/pdf`, {
                       credentials: 'include'
                     });
-                    if (!res.ok) throw new Error('Export failed');
+
+                    if (!res.ok) {
+                      const errorData = await res.json().catch(() => ({}));
+                      throw new Error(errorData.message || 'Export failed');
+                    }
+
                     const blob = await res.blob();
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -504,8 +508,12 @@ export default function IncidentDetail() {
                     a.click();
                     URL.revokeObjectURL(url);
                     toast({ title: "PDF exported successfully" });
-                  } catch (error) {
-                    toast({ title: "Export failed", variant: "destructive" });
+                  } catch (error: any) {
+                    toast({
+                      title: "Export failed",
+                      description: error.message,
+                      variant: "destructive"
+                    });
                   }
                 }}
                 className="font-mono text-xs"
