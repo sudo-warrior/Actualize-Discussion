@@ -40,7 +40,9 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  MessageSquare
+  MessageSquare,
+  Download,
+  Link2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -108,8 +110,8 @@ export default function IncidentDetail() {
       const res = await apiRequest("PATCH", `/api/incidents/${incidentId}/status`, { status });
       return res.json() as Promise<Incident>;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}`] });
+    onSuccess: (updatedIncident) => {
+      queryClient.setQueryData([`/api/incidents/${incidentId}`], updatedIncident);
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
     },
   });
@@ -472,6 +474,46 @@ export default function IncidentDetail() {
               <Trash2 className="mr-2 h-3 w-3" />
               {deleteMutation.isPending ? "DELETING..." : "DELETE INCIDENT"}
             </Button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const url = `${window.location.origin}/incidents/${incident.id}`;
+                  navigator.clipboard.writeText(url);
+                  toast({ title: "Link copied to clipboard" });
+                }}
+                className="font-mono text-xs"
+              >
+                <Link2 className="mr-2 h-3 w-3" />
+                COPY LINK
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/incidents/${incident.id}/export/pdf`, {
+                      credentials: 'include'
+                    });
+                    if (!res.ok) throw new Error('Export failed');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `incident-${incident.id}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast({ title: "PDF exported successfully" });
+                  } catch (error) {
+                    toast({ title: "Export failed", variant: "destructive" });
+                  }
+                }}
+                className="font-mono text-xs"
+              >
+                <Download className="mr-2 h-3 w-3" />
+                EXPORT PDF
+              </Button>
+            </div>
           </div>
         </div>
       </div>
