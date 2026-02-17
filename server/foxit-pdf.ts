@@ -130,10 +130,14 @@ export async function generateIncidentPDF(incident: Incident): Promise<Buffer> {
 </html>`;
 
   try {
-    // Step 1: Submit HTML to PDF task
+    // Step 1: Upload HTML content
+    const htmlBuffer = Buffer.from(htmlContent);
+    const htmlDocId = await uploadDocument(htmlBuffer, 'incident.html');
+
+    // Step 2: Submit HTML to PDF task
     const submitResponse = await axios.post(
       `${FOXIT_BASE_URL}/pdf-services/api/documents/create/pdf-from-html`,
-      { html: htmlContent, options: { format: 'A4', printBackground: true } },
+      { documentId: htmlDocId },
       { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
 
@@ -164,12 +168,14 @@ async function addWatermark(pdfBuffer: Buffer, text: string): Promise<Buffer> {
       `${FOXIT_BASE_URL}/pdf-services/api/documents/enhance/pdf-watermark`,
       {
         documentId,
-        watermark: {
-          text,
-          opacity: 0.3,
-          rotation: 45,
-          fontSize: 48,
-          color: '#cccccc'
+        config: {
+          watermark: {
+            text,
+            opacity: 0.3,
+            rotation: 45,
+            fontSize: 48,
+            color: '#cccccc'
+          }
         }
       },
       { headers: getHeaders({ 'Content-Type': 'application/json' }) }
@@ -189,7 +195,10 @@ async function makeSearchable(pdfBuffer: Buffer): Promise<Buffer> {
 
     const submitResponse = await axios.post(
       `${FOXIT_BASE_URL}/pdf-services/api/documents/analyze/pdf-ocr`,
-      { documentId, language: 'en' },
+      {
+        documentId,
+        config: { language: 'en' }
+      },
       { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
 
