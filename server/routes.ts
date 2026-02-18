@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { analyzeLogsSchema, type Incident } from "@shared/schema";
 import { analyzeLogs, getStepGuidance } from "./analyzer";
 import { isAuthenticated } from "./auth";
-import { registerChatRoutes } from "./replit_integrations/chat";
+import { registerChatRoutes, chatStorage } from "./replit_integrations/chat";
 
 function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
@@ -513,8 +513,17 @@ export async function registerRoutes(
     }
 
     try {
+      // Fetch follow-up conversations for this incident
+      const convs = await chatStorage.getConversationsByIncident(req.params.id);
+      const conversationsWithMessages = await Promise.all(
+        convs.map(async (conv) => ({
+          ...conv,
+          messages: await chatStorage.getMessagesByConversation(conv.id)
+        }))
+      );
+
       const { generateIncidentPDF } = await import("./foxit-pdf");
-      const pdfBuffer = await generateIncidentPDF(incident);
+      const pdfBuffer = await generateIncidentPDF(incident, conversationsWithMessages);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="incident-${incident.id}.pdf"`);

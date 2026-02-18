@@ -1,6 +1,6 @@
 import axios from 'axios';
 import FormData from 'form-data';
-import type { Incident } from '@shared/schema';
+import type { Incident, Conversation, Message } from '@shared/schema';
 
 const FOXIT_API_KEY = (process.env.FOXIT_API_KEY || '').trim();
 const FOXIT_API_SECRET = (process.env.FOXIT_API_SECRET || '').trim();
@@ -58,7 +58,10 @@ async function uploadDocument(pdfBuffer: Buffer, filename: string): Promise<stri
 }
 
 // Generate PDF using Foxit Document Generation API
-export async function generateIncidentPDF(incident: Incident): Promise<Buffer> {
+export async function generateIncidentPDF(
+  incident: Incident,
+  conversations: (Conversation & { messages: Message[] })[] = []
+): Promise<Buffer> {
   if (!FOXIT_API_KEY || !FOXIT_API_SECRET) {
     throw new Error('Foxit API credentials (FOXIT_API_KEY, FOXIT_API_SECRET) are not configured.');
   }
@@ -82,6 +85,13 @@ export async function generateIncidentPDF(incident: Incident): Promise<Buffer> {
     .evidence-item { background: #f9fafb; padding: 10px; margin: 8px 0; border-left: 3px solid #ef4444; font-family: monospace; font-size: 12px; }
     .step { background: #f9fafb; padding: 12px; margin: 8px 0; border-radius: 6px; border-left: 3px solid #3b82f6; }
     .step.completed { border-left-color: #10b981; background: #f0fdf4; }
+    .chat-container { margin: 10px 0 10px 30px; border-left: 2px dashed #cbd5e1; padding-left: 15px; }
+    .chat-title { font-size: 13px; color: #64748b; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .message { margin-bottom: 10px; font-size: 13px; }
+    .message-role { font-weight: bold; font-size: 11px; text-transform: uppercase; margin-bottom: 2px; }
+    .role-user { color: #2563eb; }
+    .role-assistant { color: #059669; }
+    .message-content { background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
     .footer { margin-top: 50px; padding-top: 20px; border-top: 2px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 11px; }
   </style>
 </head>
@@ -116,9 +126,24 @@ export async function generateIncidentPDF(incident: Incident): Promise<Buffer> {
     <h2>✅ Steps</h2>
     ${incident.nextSteps.map((step, i) => {
     const completed = (incident.completedSteps || []).includes(i);
-    return `<div class="step ${completed ? 'completed' : ''}">
+    const stepConversations = conversations.filter(c => c.stepIndex === i);
+
+    return `
+      <div class="step ${completed ? 'completed' : ''}">
         ${completed ? '☑' : '☐'} <strong>Step ${i + 1}:</strong> ${step}
-      </div>`;
+      </div>
+      ${stepConversations.length > 0 ? `
+        <div class="chat-container">
+          <div class="chat-title">💬 Follow-up Discussion</div>
+          ${stepConversations.map(conv => conv.messages.map(msg => `
+            <div class="message">
+              <div class="message-role role-${msg.role}">${msg.role}</div>
+              <div class="message-content">${msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            </div>
+          `).join('')).join('')}
+        </div>
+      ` : ''}
+    `;
   }).join('')}
   </div>
 
