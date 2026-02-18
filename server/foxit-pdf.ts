@@ -170,11 +170,12 @@ async function addWatermark(pdfBuffer: Buffer, text: string): Promise<Buffer> {
         documentId,
         config: {
           watermark: {
+            type: 'text',
             text,
             opacity: 0.3,
             rotation: 45,
             fontSize: 48,
-            color: '#cccccc'
+            color: 0xcccccc
           }
         }
       },
@@ -183,8 +184,12 @@ async function addWatermark(pdfBuffer: Buffer, text: string): Promise<Buffer> {
 
     const resultDocId = await pollTask(submitResponse.data.taskId);
     return await downloadDocument(resultDocId);
-  } catch (error) {
-    console.error('Watermark error:', error);
+  } catch (error: any) {
+    if (error.response?.data) {
+      console.error('Watermark API error details:', JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.error('Watermark error:', error.message);
+    }
     return pdfBuffer;
   }
 }
@@ -193,19 +198,24 @@ async function makeSearchable(pdfBuffer: Buffer): Promise<Buffer> {
   try {
     const documentId = await uploadDocument(pdfBuffer, 'incident.pdf');
 
+    // Attempting to find the correct OCR/Analyze config
     const submitResponse = await axios.post(
       `${FOXIT_BASE_URL}/pdf-services/api/documents/analyze/pdf-ocr`,
       {
         documentId,
-        config: { language: 'en' }
+        config: { languages: ['en'] }
       },
       { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
 
     const resultDocId = await pollTask(submitResponse.data.taskId);
     return await downloadDocument(resultDocId);
-  } catch (error) {
-    console.error('OCR error:', error);
+  } catch (error: any) {
+    if (error.response?.data) {
+      console.error('OCR API error details:', JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.error('OCR execution error:', error.message);
+    }
     return pdfBuffer;
   }
 }
