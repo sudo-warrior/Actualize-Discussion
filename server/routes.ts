@@ -523,7 +523,8 @@ export async function registerRoutes(
       );
 
       const { generateIncidentPDF } = await import("./foxit-pdf");
-      const pdfBuffer = await generateIncidentPDF(incident, conversationsWithMessages);
+      const limitMessages = req.query.limit ? parseInt(req.query.limit as string) : 5;
+      const pdfBuffer = await generateIncidentPDF(incident, conversationsWithMessages, { limitMessages });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="incident-${incident.id}.pdf"`);

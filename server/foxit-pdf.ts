@@ -60,7 +60,8 @@ async function uploadDocument(pdfBuffer: Buffer, filename: string): Promise<stri
 // Generate PDF using Foxit Document Generation API
 export async function generateIncidentPDF(
   incident: Incident,
-  conversations: (Conversation & { messages: Message[] })[] = []
+  conversations: (Conversation & { messages: Message[] })[] = [],
+  options: { limitMessages?: number } = { limitMessages: 5 }
 ): Promise<Buffer> {
   if (!FOXIT_API_KEY || !FOXIT_API_SECRET) {
     throw new Error('Foxit API credentials (FOXIT_API_KEY, FOXIT_API_SECRET) are not configured.');
@@ -92,6 +93,9 @@ export async function generateIncidentPDF(
     .role-user { color: #2563eb; }
     .role-assistant { color: #059669; }
     .message-content { background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
+    .guidance-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; margin: 10px 0 10px 30px; font-size: 13px; color: #1e40af; }
+    .guidance-title { font-weight: bold; margin-bottom: 5px; text-transform: uppercase; font-size: 11px; display: flex; items-center gap: 5px; }
+    .step-wrapper, .chat-container, .section { page-break-inside: avoid; }
     .footer { margin-top: 50px; padding-top: 20px; border-top: 2px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 11px; }
   </style>
 </head>
@@ -126,26 +130,65 @@ export async function generateIncidentPDF(
     <h2>✅ Steps</h2>
     ${incident.nextSteps.map((step, i) => {
     const completed = (incident.completedSteps || []).includes(i);
+    const guidance = (incident.stepGuidance as string[] || [])[i];
     const stepConversations = conversations.filter(c => c.stepIndex === i);
 
     return `
-      <div class="step ${completed ? 'completed' : ''}">
-        ${completed ? '☑' : '☐'} <strong>Step ${i + 1}:</strong> ${step}
-      </div>
-      ${stepConversations.length > 0 ? `
-        <div class="chat-container">
-          <div class="chat-title">💬 Follow-up Discussion</div>
-          ${stepConversations.map(conv => conv.messages.map(msg => `
-            <div class="message">
-              <div class="message-role role-${msg.role}">${msg.role}</div>
-              <div class="message-content">${msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-            </div>
-          `).join('')).join('')}
+      <div class="step-wrapper">
+        <div class="step ${completed ? 'completed' : ''}">
+          ${completed ? '☑' : '☐'} <strong>Step ${i + 1}:</strong> ${step}
         </div>
-      ` : ''}
+        ${guidance ? `
+          <div class="guidance-box">
+            <div class="guidance-title">✨ AI Guidance</div>
+            ${guidance.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+          </div>
+        ` : ''}
+        ${stepConversations.length > 0 ? `
+          <div class="chat-container">
+            <div class="chat-title">💬 Follow-up Discussion</div>
+            ${stepConversations.map(conv => {
+      const limit = options.limitMessages ?? 5;
+      const msgs = limit ? conv.messages.slice(-limit) : conv.messages;
+      const hasMore = limit && conv.messages.length > limit;
+
+      return `
+                ${hasMore ? `<div class="message" style="text-align:center; color:#64748b; font-size:11px;">[... ${conv.messages.length - limit} previous messages truncated ...]</div>` : ''}
+                ${msgs.map(msg => `
+                  <div class="message">
+                    <div class="message-role role-${msg.role}">${msg.role}</div>
+                    <div class="message-content">${msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                  </div>
+                `).join('')}
+              `;
+    }).join('')}
+          </div>
+        ` : ''}
+      </div>
     `;
   }).join('')}
   </div>
+
+  ${conversations.some(c => c.stepIndex === null) ? `
+    <div class="section">
+      <h2>💬 General Discussions</h2>
+      ${conversations.filter(c => c.stepIndex === null).map(conv => {
+    const limit = options.limitMessages ?? 5;
+    const msgs = limit ? conv.messages.slice(-limit) : conv.messages;
+    return `
+          <div class="chat-container">
+            <div class="chat-title">${conv.title}</div>
+            ${msgs.map(msg => `
+              <div class="message">
+                <div class="message-role role-${msg.role}">${msg.role}</div>
+                <div class="message-content">${msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+  }).join('')}
+    </div>
+  ` : ''}
 
   <div class="footer">
     <p><strong>Incident Commander</strong> • ${new Date().toLocaleString()}</p>
@@ -248,10 +291,20 @@ async function makeSearchable(pdfBuffer: Buffer): Promise<Buffer> {
 }
 
 export async function mergeIncidentPDFs(incidents: Incident[]): Promise<Buffer> {
+  const { chatStorage } = await import("./replit_integrations/chat/storage");
   try {
     const documentIds: string[] = [];
     for (const incident of incidents) {
-      const pdfBuffer = await generateIncidentPDF(incident);
+      // Fetch conversations for this incident
+      const convs = await chatStorage.getConversationsByIncident(incident.id);
+      const conversationsWithMessages = await Promise.all(
+        convs.map(async (conv) => ({
+          ...conv,
+          messages: await chatStorage.getMessagesByConversation(conv.id)
+        }))
+      );
+
+      const pdfBuffer = await generateIncidentPDF(incident, conversationsWithMessages);
       const docId = await uploadDocument(pdfBuffer, `incident-${incident.id}.pdf`);
       documentIds.push(docId);
     }
