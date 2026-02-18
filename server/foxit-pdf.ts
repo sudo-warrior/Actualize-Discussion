@@ -169,14 +169,13 @@ async function addWatermark(pdfBuffer: Buffer, text: string): Promise<Buffer> {
       {
         documentId,
         config: {
-          watermark: {
-            type: 'text',
-            text,
-            opacity: 0.3,
-            rotation: 45,
-            fontSize: 48,
-            color: 0xcccccc
-          }
+          content: text,
+          type: 'TEXT',
+          opacity: 60,
+          rotation: 45,
+          fontSize: 48,
+          color: '#CCCCCC',
+          pageRanges: 'all'
         }
       },
       { headers: getHeaders({ 'Content-Type': 'application/json' }) }
@@ -203,7 +202,10 @@ async function makeSearchable(pdfBuffer: Buffer): Promise<Buffer> {
       `${FOXIT_BASE_URL}/pdf-services/api/documents/analyze/pdf-ocr`,
       {
         documentId,
-        config: { languages: ['en'] }
+        config: {
+          languages: ['en-US'],
+          pageRanges: 'all'
+        }
       },
       { headers: getHeaders({ 'Content-Type': 'application/json' }) }
     );
