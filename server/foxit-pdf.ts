@@ -169,7 +169,7 @@ async function addWatermark(pdfBuffer: Buffer, text: string): Promise<Buffer> {
       {
         documentId,
         config: {
-          content: text,
+          text: text,
           type: 'TEXT',
           opacity: 60,
           rotation: 45,
