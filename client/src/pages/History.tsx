@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Incident } from "@shared/schema";
+import { getAuthHeaders } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
 import {
@@ -56,9 +57,13 @@ export default function History() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/incidents/bulk/delete", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ ids }),
       });
       if (!res.ok) throw new Error("Failed to delete");
@@ -73,9 +78,13 @@ export default function History() {
 
   const bulkExportMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/incidents/export/bulk", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ ids }),
         credentials: 'include'
       });
@@ -95,9 +104,13 @@ export default function History() {
 
   const bulkStatusMutation = useMutation({
     mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/incidents/bulk/status", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ ids, status }),
       });
       if (!res.ok) throw new Error("Failed to update");
@@ -117,7 +130,7 @@ export default function History() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -265,11 +278,10 @@ export default function History() {
                   key={s}
                   data-testid={`button-filter-${s}`}
                   onClick={() => setSeverityFilter(s)}
-                  className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors whitespace-nowrap ${
-                    severityFilter === s
+                  className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors whitespace-nowrap ${severityFilter === s
                       ? "bg-primary/20 text-primary"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {s}
                 </button>
@@ -282,11 +294,10 @@ export default function History() {
                   key={s.value}
                   data-testid={`button-sort-${s.value}`}
                   onClick={() => setSortBy(s.value)}
-                  className={`px-2 py-1 rounded text-[10px] font-mono tracking-wider transition-colors whitespace-nowrap ${
-                    sortBy === s.value
+                  className={`px-2 py-1 rounded text-[10px] font-mono tracking-wider transition-colors whitespace-nowrap ${sortBy === s.value
                       ? "bg-primary/20 text-primary"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {s.label}
                 </button>

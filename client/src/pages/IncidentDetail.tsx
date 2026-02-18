@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import type { Incident } from "@shared/schema";
 import { useRoute, useLocation } from "wouter";
@@ -448,10 +448,10 @@ export default function IncidentDetail() {
                     data-testid={`button-status-${s}`}
                     onClick={() => statusMutation.mutate(s)}
                     className={`w-full text-left px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider transition-colors border ${incident.status === s
-                        ? s === "resolved" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
-                          : s === "critical" ? "bg-red-500/20 border-red-500/30 text-red-400"
-                            : "bg-blue-500/20 border-blue-500/30 text-blue-400"
-                        : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                      ? s === "resolved" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
+                        : s === "critical" ? "bg-red-500/20 border-red-500/30 text-red-400"
+                          : "bg-blue-500/20 border-blue-500/30 text-blue-400"
+                      : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
                       }`}
                   >
                     {s === "resolved" && <CheckCircle2 className="h-3 w-3 inline mr-2" />}
@@ -491,7 +491,9 @@ export default function IncidentDetail() {
                 variant="outline"
                 onClick={async () => {
                   try {
+                    const authHeaders = await getAuthHeaders();
                     const res = await fetch(`/api/incidents/${incident.id}/export/pdf`, {
+                      headers: authHeaders,
                       credentials: 'include'
                     });
 
