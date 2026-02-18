@@ -56,6 +56,7 @@ export default function IncidentDetail() {
   const [guidanceData, setGuidanceData] = useState<Record<number, string>>({});
   const [loadingGuidance, setLoadingGuidance] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<Incident>({
     queryKey: [`/api/incidents/${incidentId}`],
@@ -489,7 +490,9 @@ export default function IncidentDetail() {
               </Button>
               <Button
                 variant="outline"
+                disabled={isExporting}
                 onClick={async () => {
+                  setIsExporting(true);
                   try {
                     const authHeaders = await getAuthHeaders();
                     const res = await fetch(`/api/incidents/${incident.id}/export/pdf`, {
@@ -516,12 +519,18 @@ export default function IncidentDetail() {
                       description: error.message,
                       variant: "destructive"
                     });
+                  } finally {
+                    setIsExporting(false);
                   }
                 }}
                 className="font-mono text-xs"
               >
-                <Download className="mr-2 h-3 w-3" />
-                EXPORT PDF
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-3 w-3" />
+                )}
+                {isExporting ? "EXPORTING..." : "EXPORT PDF"}
               </Button>
             </div>
           </div>

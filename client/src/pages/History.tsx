@@ -261,7 +261,11 @@ export default function History() {
                   onClick={() => bulkExportMutation.mutate(selectedIds)}
                   disabled={bulkExportMutation.isPending}
                 >
-                  <Download className="h-3 w-3 mr-1" />
+                  {bulkExportMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <Download className="h-3 w-3 mr-1" />
+                  )}
                   {bulkExportMutation.isPending ? 'Exporting...' : 'Export PDF'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
@@ -279,8 +283,8 @@ export default function History() {
                   data-testid={`button-filter-${s}`}
                   onClick={() => setSeverityFilter(s)}
                   className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors whitespace-nowrap ${severityFilter === s
-                      ? "bg-primary/20 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   {s}
@@ -295,8 +299,8 @@ export default function History() {
                   data-testid={`button-sort-${s.value}`}
                   onClick={() => setSortBy(s.value)}
                   className={`px-2 py-1 rounded text-[10px] font-mono tracking-wider transition-colors whitespace-nowrap ${sortBy === s.value
-                      ? "bg-primary/20 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   {s.label}
