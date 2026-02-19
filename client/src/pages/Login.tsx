@@ -15,10 +15,13 @@ export default function Login() {
     setLoading(true);
     setMessage("");
 
+    const runtimeEnv = (globalThis as unknown as { __ENV__?: { VITE_APP_URL?: string } }).__ENV__ ?? {};
+    const appUrl = runtimeEnv.VITE_APP_URL || import.meta.env.VITE_APP_URL || window.location.origin;
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: appUrl,
       },
     });
 

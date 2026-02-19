@@ -34,6 +34,7 @@ app.get("/env.js", (_req, res) => {
   const publicEnv = {
     VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
+    VITE_APP_URL: process.env.VITE_APP_URL,
   };
   res.send(`window.__ENV__ = ${JSON.stringify(publicEnv)};`);
 });
