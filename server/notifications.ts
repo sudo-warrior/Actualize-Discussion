@@ -1,14 +1,20 @@
 let resend: any = null;
 
-// Dynamically import resend only if API key is configured
-if (process.env.RESEND_API_KEY) {
-  try {
-    const { Resend } = await import('resend');
-    resend = new Resend(process.env.RESEND_API_KEY);
-  } catch (error) {
-    console.log('[Email] Resend package not available, email notifications disabled');
+// Initialize resend asynchronously
+async function initResend() {
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const { Resend } = await import('resend');
+      resend = new Resend(process.env.RESEND_API_KEY);
+      console.log('[Email] Resend initialized');
+    } catch (error) {
+      console.log('[Email] Resend package not available, email notifications disabled');
+    }
   }
 }
+
+// Initialize on module load
+initResend().catch(console.error);
 
 export interface EmailNotification {
   to: string;
