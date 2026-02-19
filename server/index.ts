@@ -27,6 +27,17 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Runtime env for client (avoids baking VITE_ vars at build time)
+app.get("/env.js", (_req, res) => {
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  const publicEnv = {
+    VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
+  };
+  res.send(`window.__ENV__ = ${JSON.stringify(publicEnv)};`);
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
