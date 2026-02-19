@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -27,6 +27,8 @@ function AuthenticatedRouter() {
       <Route path="/docs" component={ApiDocs} />
       <Route path="/incidents/:id/chat" component={IncidentChat} />
       <Route path="/incidents/:id" component={IncidentDetail} />
+      <Route path="/login">{() => <Redirect to="/" />}</Route>
+      <Route path="/register">{() => <Redirect to="/" />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
