@@ -1,8 +1,8 @@
 #!/bin/bash
 # Build Docker image with Supabase credentials
 
-# Load environment variables
-source .env
+# Load environment variables (handling non-exported ones)
+export $(grep -v '^#' .env | xargs)
 
 # Build with build args
 docker build \

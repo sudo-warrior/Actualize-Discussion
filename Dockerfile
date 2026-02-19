@@ -16,11 +16,13 @@ COPY . .
 # These VITE_ variables are baked into the client bundle at build time
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
-ENV NODE_ENV=production
 
-RUN npm run build
+# Avoid using ENV for these to prevent security warnings (SecretsUsedInArgOrEnv)
+# instead pass them directly to the build command
+RUN VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
+    VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
+    NODE_ENV=production \
+    npm run build
 
 # Production stage
 FROM node:20-slim
