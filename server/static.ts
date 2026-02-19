@@ -48,7 +48,7 @@ export function serveStatic(app: Express) {
   }));
 
   // SPA fallback - serve index.html for non-file routes
-  app.get('*', (req: Request, res: Response) => {
+  app.use((req: Request, res: Response, next) => {
     console.log(`[static] SPA fallback for: ${req.path}`);
     
     // If it looks like a file request that wasn't found, 404 it
