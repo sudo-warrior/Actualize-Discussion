@@ -36,9 +36,8 @@ export function serveStatic(app: Express) {
 
   // Serve static files - this MUST come first
   app.use(express.static(publicPath, {
-    index: false, // Don't serve index.html automatically
+    index: false,
     setHeaders: (res: Response, filePath: string) => {
-      console.log(`[static] express.static serving: ${filePath}`);
       if (filePath.endsWith('.js')) {
         res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       } else if (filePath.endsWith('.css')) {
@@ -47,13 +46,15 @@ export function serveStatic(app: Express) {
     }
   }));
 
-  // SPA fallback - serve index.html for non-file routes
+  // SPA fallback - serve index.html for non-API, non-file routes
   app.use((req: Request, res: Response, next) => {
-    console.log(`[static] SPA fallback for: ${req.path}`);
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
     
-    // If it looks like a file request that wasn't found, 404 it
-    if (req.path.match(/\.[a-z]+$/i)) {
-      console.log(`[static] File not found: ${req.path}`);
+    // If it's a file request (has extension), it wasn't found - 404 it
+    if (req.path.match(/\.[a-z0-9]+$/i)) {
       return res.status(404).send('Not found');
     }
     
