@@ -12,8 +12,14 @@ RUN npm install --legacy-peer-deps --force
 # Copy source code
 COPY . .
 
-# Build application
+# Build application with environment variables
+# These VITE_ variables are baked into the client bundle at build time
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 ENV NODE_ENV=production
+
 RUN npm run build
 
 # Production stage
