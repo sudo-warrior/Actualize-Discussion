@@ -154,7 +154,7 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
             />
           </div>
         )}
-        <div className="space-y-1 px-2">
+        <div className="space-y-1 px-2 overflow-y-auto max-h-[400px]">
           {recentIncidents.length === 0 && (
             <p className="text-xs text-muted-foreground px-3 py-4 text-center">No incidents yet. Analyze some logs to get started.</p>
           )}
