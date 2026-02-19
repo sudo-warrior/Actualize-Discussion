@@ -3,7 +3,11 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  const publicPath = path.resolve(__dirname, "../public");
+  // In production (bundled), __dirname is dist/, so public is at ./public
+  // In development, __dirname is server/, so public is at ../client/dist
+  const publicPath = process.env.NODE_ENV === 'production' 
+    ? path.resolve(__dirname, "./public")
+    : path.resolve(__dirname, "../dist/public");
   
   console.log(`[static] __dirname: ${__dirname}`);
   console.log(`[static] publicPath: ${publicPath}`);
