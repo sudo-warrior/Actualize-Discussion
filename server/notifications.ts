@@ -1,8 +1,14 @@
-import { Resend } from 'resend';
+let resend: any = null;
 
-const resend = process.env.RESEND_API_KEY 
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+// Dynamically import resend only if API key is configured
+if (process.env.RESEND_API_KEY) {
+  try {
+    const { Resend } = await import('resend');
+    resend = new Resend(process.env.RESEND_API_KEY);
+  } catch (error) {
+    console.log('[Email] Resend package not available, email notifications disabled');
+  }
+}
 
 export interface EmailNotification {
   to: string;
