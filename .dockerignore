@@ -4,4 +4,9 @@ node_modules
 .qodo
 .env
 *.log
+cli/node_modules
+cli/dist
+dist
+.replit
+replit.nix
 
