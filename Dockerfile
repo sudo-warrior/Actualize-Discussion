@@ -11,6 +11,10 @@ COPY . .
 ENV NODE_ENV=production
 RUN npm run build
 
+# Debug: list dist contents
+RUN ls -la dist/
+RUN ls -la dist/public/ | head -20
+
 # Expose port
 EXPOSE 5000
 
