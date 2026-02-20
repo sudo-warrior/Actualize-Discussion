@@ -30,8 +30,10 @@ RUN npm install --production --legacy-peer-deps --force
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
-# Create symlink for static files (server expects /app/public)
-RUN ln -s /app/dist/public /app/public
+# IMPORTANT: Copy public files to where the server expects them
+# The server looks for ../public relative to dist/index.cjs
+# So we need files at /app/public (not /app/dist/public)
+RUN cp -r /app/dist/public /app/public
 
 # Expose port
 EXPOSE 5000
