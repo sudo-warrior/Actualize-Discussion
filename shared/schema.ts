@@ -45,7 +45,45 @@ export const incidents = pgTable("incidents", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const templates = pgTable("templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),
+  sampleLogs: text("sample_logs").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const tags = pgTable("tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  color: varchar("color", { length: 7 }).notNull().default("#3b82f6"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const incidentTags = pgTable("incident_tags", {
+  incidentId: varchar("incident_id").notNull(),
+  tagId: varchar("tag_id").notNull(),
+});
+
+export const favorites = pgTable("favorites", {
+  userId: varchar("user_id").notNull(),
+  incidentId: varchar("incident_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertIncidentSchema = createInsertSchema(incidents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTemplateSchema = createInsertSchema(templates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTagSchema = createInsertSchema(tags).omit({
   id: true,
   createdAt: true,
 });
@@ -57,3 +95,8 @@ export const analyzeLogsSchema = z.object({
 export type InsertIncident = z.infer<typeof insertIncidentSchema>;
 export type Incident = typeof incidents.$inferSelect;
 export type AnalyzeLogsInput = z.infer<typeof analyzeLogsSchema>;
+export type Template = typeof templates.$inferSelect;
+export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
+export type Tag = typeof tags.$inferSelect;
+export type InsertTag = z.infer<typeof insertTagSchema>;
+export type Favorite = typeof favorites.$inferSelect;

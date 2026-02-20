@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/auth-utils";
-import type { Incident } from "@shared/schema";
+import type { Incident, Template } from "@shared/schema";
 import { useLocation } from "wouter";
 import { 
   Play, 
@@ -28,9 +28,16 @@ import {
   ChevronDown,
   ChevronUp,
   MessageSquare,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Home() {
   const { toast } = useToast();
@@ -41,6 +48,38 @@ export default function Home() {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [guidanceData, setGuidanceData] = useState<Record<number, string>>({});
   const [loadingGuidance, setLoadingGuidance] = useState<number | null>(null);
+
+  const { data: templates = [] } = useQuery<Template[]>({
+    queryKey: ["/api/templates"],
+  });
+
+  // Built-in templates
+  const builtInTemplates = [
+    {
+      name: "Database Connection Error",
+      category: "database",
+      sampleLogs: `[ERROR] 2024-01-15 10:23:45 - Connection timeout to database
+[ERROR] Failed to connect to PostgreSQL at localhost:5432
+[ERROR] Max pool size reached: 20/20 connections active
+[ERROR] Query timeout after 30000ms`
+    },
+    {
+      name: "API Rate Limit",
+      category: "api",
+      sampleLogs: `[WARN] 2024-01-15 10:25:12 - Rate limit exceeded for API key: abc123
+[ERROR] 429 Too Many Requests - Retry after 60 seconds
+[INFO] Request count: 1000/1000 in current window
+[ERROR] Dropping incoming requests`
+    },
+    {
+      name: "Memory Leak",
+      category: "performance",
+      sampleLogs: `[WARN] 2024-01-15 10:30:00 - High memory usage: 85%
+[ERROR] Out of memory: Heap size exceeded
+[ERROR] GC overhead limit exceeded
+[FATAL] Application crashed due to memory exhaustion`
+    },
+  ];
 
   const analyzeMutation = useMutation({
     mutationFn: async (logInput: string) => {
@@ -193,6 +232,36 @@ export default function Home() {
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" />
                   </div>
                   <span className="text-xs font-mono text-muted-foreground ml-2">input.log</span>
+                  {(builtInTemplates.length > 0 || templates.length > 0) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="ml-auto text-xs">
+                          <FileText className="h-3 w-3 mr-1" />
+                          Templates
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        {builtInTemplates.map((template, i) => (
+                          <DropdownMenuItem
+                            key={i}
+                            onClick={() => setLogs(template.sampleLogs)}
+                          >
+                            <FileText className="h-3 w-3 mr-2" />
+                            {template.name}
+                          </DropdownMenuItem>
+                        ))}
+                        {templates.map((template) => (
+                          <DropdownMenuItem
+                            key={template.id}
+                            onClick={() => setLogs(template.sampleLogs)}
+                          >
+                            <FileText className="h-3 w-3 mr-2" />
+                            {template.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
                 <Badge variant="outline" className="text-[10px] font-mono bg-primary/5 text-primary border-primary/20">
                   PLAIN TEXT

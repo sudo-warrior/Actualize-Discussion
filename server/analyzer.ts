@@ -41,7 +41,7 @@ Severity guidelines:
 - medium: Intermittent errors, performance issues, warnings that need attention
 - low: Informational, minor warnings, non-impacting issues
 
-Always provide actionable, specific fixes — not generic advice. Reference specific log lines in your evidence.
+Always provide actionable, specific fixes - not generic advice. Reference specific log lines in your evidence.
 Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.`;
 
 export async function analyzeLogs(rawLogs: string): Promise<AnalysisResult> {
@@ -143,7 +143,7 @@ function fallbackAnalysis(rawLogs: string): AnalysisResult {
     if (p.regex.test(rawLogs)) {
       return {
         title: p.title,
-        rootCause: `Pattern detected: ${p.title}. AI analysis unavailable — using fallback pattern matching.`,
+        rootCause: `Pattern detected: ${p.title}. AI analysis unavailable - using fallback pattern matching.`,
         confidence: p.confidence,
         severity: p.severity,
         evidence: errorLines.length > 0 ? errorLines : lines.slice(0, 3),

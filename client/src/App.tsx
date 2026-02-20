@@ -47,7 +47,15 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <Landing />;
+    return (
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/" component={Landing} />
+        <Route>
+          <Landing />
+        </Route>
+      </Switch>
+    );
   }
 
   // Check if user needs onboarding

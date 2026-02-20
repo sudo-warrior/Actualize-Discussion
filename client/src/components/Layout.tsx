@@ -46,6 +46,13 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
     refetchInterval: 10000,
   });
 
+  const { data: unresolvedData } = useQuery<{ count: number }>({
+    queryKey: ["/api/incidents/count/unresolved"],
+    refetchInterval: 10000,
+  });
+
+  const unresolvedCount = unresolvedData?.count || 0;
+
   const filteredIncidents = searchQuery
     ? incidents.filter(i => 
         i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -111,6 +118,11 @@ export default function Layout({ children, onIncidentSelect }: LayoutProps) {
             )}>
               <History className="h-4 w-4" />
               History
+              {unresolvedCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {unresolvedCount}
+                </span>
+              )}
           </Link>
           <Link href="/docs" onClick={handleNavClick} className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",

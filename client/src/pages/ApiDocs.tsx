@@ -304,11 +304,11 @@ export default function ApiDocs() {
             <CodeBlock code={JSON.stringify({ error: "Description of what went wrong" }, null, 2)} />
             <div className="mt-4 space-y-2">
               {[
-                { code: "400", desc: "Bad Request — Invalid input or missing fields" },
-                { code: "401", desc: "Unauthorized — Missing or invalid API key" },
-                { code: "403", desc: "Forbidden — You don't own this resource" },
-                { code: "404", desc: "Not Found — Resource doesn't exist" },
-                { code: "500", desc: "Server Error — Something went wrong on our end" },
+                { code: "400", desc: "Bad Request - Invalid input or missing fields" },
+                { code: "401", desc: "Unauthorized - Missing or invalid API key" },
+                { code: "403", desc: "Forbidden - You don't own this resource" },
+                { code: "404", desc: "Not Found - Resource doesn't exist" },
+                { code: "500", desc: "Server Error - Something went wrong on our end" },
               ].map((err) => (
                 <div key={err.code} className="flex items-center gap-3 text-xs">
                   <Badge variant="outline" className="font-mono text-[10px] w-10 justify-center">{err.code}</Badge>

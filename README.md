@@ -2,9 +2,9 @@
 
 ## Overview
 
-Incident Commander is an AI-powered incident analysis and resolution tool. Users paste raw server/application logs into a terminal-style interface, and the system analyzes them using Gemini AI to identify root causes, severity levels, confidence scores, and recommended fixes. Results are stored as incidents in a PostgreSQL database and can be browsed via a dashboard. Authentication is handled via Replit Auth (Google, GitHub, email/magic link).
+Incident Commander is an AI-powered incident analysis and resolution tool. Users paste raw server/application logs into a terminal-style interface, and the system analyzes them using Gemini AI to identify root causes, severity levels, confidence scores, and recommended fixes. Results are stored as incidents in a PostgreSQL database and can be browsed via a dashboard. Authentication is handled via Supabase (Magic Link), and reports can be exported as enhanced PDFs (with Watermarking, OCR, and AI Guidance) using Foxit PDF Services.
 
-The app follows a monorepo structure with a React frontend, Express backend, and shared schema definitions. It's designed as a hackathon-style project optimized for Replit deployment.
+The app follows a modern full-stack structure with a React frontend, Express backend, and shared schema definitions. It is optimized for local development and standard Cloud deployments (PostgreSQL + Supabase).
 
 ## User Preferences
 
@@ -15,47 +15,51 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Directory Structure
-- `client/` — React frontend (Vite-based SPA)
-- `server/` — Express backend API
-- `server/replit_integrations/` — Integration modules (auth, chat, image, batch)
-- `shared/` — Shared TypeScript types and database schema (used by both client and server)
-- `shared/models/` — Sub-schemas (auth.ts, chat.ts)
-- `script/` — Build scripts
+- `client/` - React frontend (Vite-based SPA)
+- `server/` - Express backend API
+- `server/auth.ts` - Supabase authentication middleware
+- `server/foxit-pdf.ts` - Foxit Fusion API integration for PDF export
+- `server/supabase.ts` - Server-side Supabase client
+- `server/replit_integrations/` - AI modules (chat, batch)
+- `shared/` - Shared TypeScript types and database schema
+- `shared/models/` - Sub-schemas (auth.ts, chat.ts)
 
 ### Frontend Architecture
 - **Framework**: React with TypeScript, bundled by Vite
-- **Routing**: Wouter with views: Landing (unauthenticated), Home (`/`), Dashboard (`/dashboard`), History (`/history`), Profile (`/profile`), Incident Detail (`/incidents/:id`), API Docs (`/docs`)
-- **Authentication**: Replit Auth via `useAuth()` hook. Landing page shown when logged out.
+- **Routing**: Wouter with views: Landing, Home, Dashboard, History, Profile, Incident Detail (`/incidents/:id`), Incident Chat (`/incidents/:id/chat`), API Docs
+- **Authentication**: Supabase Auth (Magic Link) via `useAuth()` hook. Session-less JWT flow.
 - **State Management**: TanStack React Query for server state, local React state for UI
 - **UI Components**: shadcn/ui component library (new-york style) built on Radix UI primitives
 - **Styling**: Tailwind CSS v4 with CSS variables for theming, dark mode by default
-- **Fonts**: Space Grotesk (sans) and JetBrains Mono (mono) — terminal/command aesthetic
+- **Fonts**: Space Grotesk (sans) and JetBrains Mono (mono) - terminal/command aesthetic
 - **Animations**: Framer Motion for transitions
 - **API Communication**: Custom `apiRequest` utility wrapping fetch, integrated with React Query's `queryFn`
 
 ### Backend Architecture
-- **Framework**: Express 5 on Node.js, written in TypeScript (executed via tsx)
-- **Authentication**: Replit Auth (OpenID Connect) via `server/replit_integrations/auth/`
-- **AI Analysis**: Gemini 2.5 Flash via Replit AI Integrations (no personal API key needed, billed to Replit credits)
-- **API Pattern**: RESTful JSON API under `/api/` prefix (session auth) and `/api/v1/` prefix (API key auth for developers)
+- **Framework**: Express 5 on Node.js
+- **Authentication**: Supabase Auth (JWT validation) via `server/auth.ts`
+- **AI Analysis**: Gemini 2.5 Flash for log analysis and remediation guidance
+- **PDF Export**: Foxit Fusion API for generating watermarked, searchable (OCR) reports with conversation history.
+- **API Pattern**: RESTful JSON API under `/api/` (authenticated) and `/api/v1/` (API key auth)
 - **Key Endpoints** (session-protected via `isAuthenticated` middleware):
-  - `POST /api/incidents/analyze` — Submit logs for AI analysis, creates an incident record
-  - `GET /api/incidents` — List user's incidents (filtered by userId)
-  - `GET /api/incidents/:id` — Get single incident details
-  - `PATCH /api/incidents/:id/status` — Update incident status
-  - `GET /api/incidents/stats/summary` — Dashboard metrics (real data from DB)
-  - `POST /api/keys` — Create a new API key (returns raw key once)
-  - `GET /api/keys` — List user's API keys (prefix only, no raw keys)
-  - `DELETE /api/keys/:id` — Revoke an API key
-  - `GET /api/login` — Begin Replit Auth login flow
-  - `GET /api/logout` — Logout
-  - `GET /api/auth/user` — Get current authenticated user
+  - `POST /api/incidents/analyze` - Submit logs for AI analysis, creates an incident record
+  - `GET /api/incidents` - List user's incidents (filtered by userId)
+  - `GET /api/incidents/:id` - Get single incident details
+  - `PATCH /api/incidents/:id/status` - Update incident status
+  - `GET /api/incidents/stats/summary` - Dashboard metrics (real data from DB)
+  - `POST /api/keys` - Create a new API key (returns raw key once)
+  - `GET /api/keys` - List user's API keys (prefix only, no raw keys)
+  - `DELETE /api/keys/:id` - Revoke an API key
+  - `POST /api/incidents/:id/export/pdf` - Export incident as enhanced PDF
+  - `POST /api/incidents/export/bulk` - Export multiple incidents in a single merged PDF
+  - `GET /api/auth/user` - Get current Supabase user
+  - `POST /api/login` - Begin Supabase Magic Link flow
 - **Developer API v1 Endpoints** (API key auth via `apiKeyAuth` middleware, `Authorization: Bearer` or `X-API-Key`):
-  - `POST /api/v1/incidents/analyze` — Submit logs for analysis
-  - `GET /api/v1/incidents` — List incidents
-  - `GET /api/v1/incidents/:id` — Get incident details
-  - `PATCH /api/v1/incidents/:id/status` — Update incident status
-  - `DELETE /api/v1/incidents/:id` — Delete an incident
+  - `POST /api/v1/incidents/analyze` - Submit logs for analysis
+  - `GET /api/v1/incidents` - List incidents
+  - `GET /api/v1/incidents/:id` - Get incident details
+  - `PATCH /api/v1/incidents/:id/status` - Update incident status
+  - `DELETE /api/v1/incidents/:id` - Delete an incident
 - **API Key Security**: Keys are hashed (SHA-256) before storage; only the prefix (`ic_xxxxxxxx`) is stored in plaintext. Raw key shown once on creation. Keys can be revoked. `lastUsedAt` tracked per key.
 - **Log Analysis**: Gemini AI with strict prompt engineering (only analyzes logs, rejects non-log input). Falls back to regex pattern matching if AI is unavailable.
 - **Validation**: Zod schemas (shared between client and server via `drizzle-zod`)
@@ -66,12 +70,13 @@ Preferred communication style: Simple, everyday language.
 - **DB Module**: `server/db.ts` exports shared `db` instance used by all storage modules
 - **Schema Push**: Use `npm run db:push` to sync schema to database
 - **Tables**:
-  - `incidents` — id (UUID), userId, title, severity, status, confidence, rawLogs, rootCause, fix, evidence[], nextSteps[], completedSteps[], createdAt
-  - `api_keys` — id (UUID), userId, name, keyHash (SHA-256), keyPrefix, revoked, lastUsedAt, createdAt
-  - `users` — Replit Auth user records (id, email, firstName, lastName, profileImageUrl)
-  - `sessions` — Express session storage for auth
-  - `conversations` / `messages` — Chat integration tables (from Gemini blueprint)
-- **Storage Layer**: `DatabaseStorage` class in `server/storage.ts` implementing `IStorage` interface
+  - `incidents` - id, userId, title, severity, status, rootCause, fix, evidence[], nextSteps[], completedSteps[], stepGuidance[], createdAt
+  - `api_keys` - id, userId, name, keyHash, keyPrefix, requestCount, lastResetDate, lastUsedAt
+  - `templates` - Pre-defined log templates for analysis
+  - `tags` / `incident_tags` - Organizing incidents
+  - `favorites` - User-starred incidents
+  - `conversations` / `messages` - Follow-up discussions linked to incidents/steps
+- **Storage Layer**: `DatabaseStorage` class in `server/storage.ts` using Drizzle ORM
 
 ### Build System
 - **Development**: `npm run dev` starts Express with Vite middleware (tsx for TypeScript execution)
@@ -80,29 +85,52 @@ Preferred communication style: Simple, everyday language.
 
 ## Integrations
 
-### Replit Auth
-- OpenID Connect authentication via Replit
-- Supports Google, GitHub, X, Apple, email/password login
-- Session stored in PostgreSQL
-- Files: `server/replit_integrations/auth/`
+### Supabase Auth
+- Passwordless authentication via Magic Link.
+- JWT-based authentication for all API routes.
+- Handles user sign-up, sign-in, and profile management.
+- Files: `server/auth.ts`, `server/supabase.ts`, `client/src/lib/supabase.ts`
 
-### Gemini AI (Replit AI Integrations)
-- Uses `AI_INTEGRATIONS_GEMINI_BASE_URL` and `AI_INTEGRATIONS_GEMINI_API_KEY` env vars (auto-configured)
-- Model: gemini-2.5-flash for log analysis
-- No personal API key needed — charges billed to Replit credits
-- Files: `server/replit_integrations/chat/`, `server/replit_integrations/image/`
+### Foxit PDF Services
+- **Document Generation**: Converts incident data (HTML) to PDF.
+- **Watermarking**: Adds "CONFIDENTIAL" watermark to reports.
+- **OCR**: Makes exported PDFs searchable and accessible.
+- **Content Enrichment**: Includes AI remediation guidance and user-AI follow-up conversations.
+- Files: `server/foxit-pdf.ts`
 
-## External Dependencies
+### Gemini AI
+- **Model**: `gemini-2.5-flash`
+- **Used for**: Log analysis, RCA, fix suggestions, and interactive remediation assistance.
+- **Files**: `server/analyzer.ts`, `server/replit_integrations/chat/`
 
-### Key NPM Packages
-- **@google/genai** — Gemini AI client
-- **drizzle-orm** + **drizzle-kit** — Database ORM and schema management
-- **express** v5 — HTTP server framework
-- **@tanstack/react-query** — Client-side data fetching and caching
-- **zod** + **drizzle-zod** — Schema validation
-- **framer-motion** — UI animations
-- **wouter** — Client-side routing
-- **date-fns** — Date formatting
-- **passport** + **openid-client** — Authentication
-- **express-session** + **connect-pg-simple** — Session management
-- **recharts** — Dashboard charts
+## Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+### Authentication (Supabase)
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_ANON_KEY`: Your Supabase anonymous key
+- `VITE_SUPABASE_URL`: (Client-side) Same as SUPABASE_URL
+- `VITE_SUPABASE_ANON_KEY`: (Client-side) Same as SUPABASE_ANON_KEY
+
+### PDF Export (Foxit)
+- `FOXIT_API_KEY`: Your Foxit Fusion API key
+- `FOXIT_API_SECRET`: Your Foxit Fusion API secret
+
+### AI Analysis (Gemini)
+- `GEMINI_API_KEY`: Your Google Gemini API key
+
+### Database
+- `DATABASE_URL`: PostgreSQL connection string (Neon or similar)
+
+## Key NPM Packages
+- **@supabase/supabase-js** - Supabase client for auth and data
+- **axios** - HTTP client for Foxit API communication
+- **drizzle-orm** + **drizzle-kit** - Database ORM and migrations
+- **express** v5 - Backend API framework
+- **@google/genai** - Gemini AI integration
+- **@tanstack/react-query** - Frontend state and data fetching
+- **framer-motion** - UI animations and transitions
+- **lucide-react** - Icon system
+- **wouter** - Client-side routing
+- **zod** - Schema validation and type safety

@@ -1,5 +1,5 @@
-import { type Incident, type InsertIncident, incidents, type ApiKey, type InsertApiKey, apiKeys } from "@shared/schema";
-import { desc, eq, and, sql } from "drizzle-orm";
+import { type Incident, type InsertIncident, incidents, type ApiKey, type InsertApiKey, apiKeys, type Template, type InsertTemplate, templates, type Tag, type InsertTag, tags, incidentTags, favorites } from "@shared/schema";
+import { desc, eq, and, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 
 export interface IStorage {
@@ -9,7 +9,10 @@ export interface IStorage {
   getIncidentsByUser(userId: string): Promise<Incident[]>;
   updateIncidentStatus(id: string, status: Incident["status"]): Promise<Incident | undefined>;
   toggleStepCompletion(id: string, stepIndex: number): Promise<Incident | undefined>;
+  completeAllSteps(id: string, stepIndices: number[]): Promise<Incident | undefined>;
   deleteIncident(id: string): Promise<boolean>;
+  bulkUpdateStatus(ids: string[], status: Incident["status"], userId: string): Promise<number>;
+  bulkDeleteIncidents(ids: string[], userId: string): Promise<number>;
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   getApiKeysByUser(userId: string): Promise<ApiKey[]>;
   findApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
@@ -18,6 +21,19 @@ export interface IStorage {
   getApiKey(id: string): Promise<ApiKey | undefined>;
   revokeApiKey(userId: string, id: string): Promise<boolean>;
   saveStepGuidance(id: string, stepIndex: number, guidance: string): Promise<Incident | undefined>;
+  createTemplate(template: InsertTemplate): Promise<Template>;
+  getTemplatesByUser(userId: string): Promise<Template[]>;
+  deleteTemplate(id: string, userId: string): Promise<boolean>;
+  createTag(tag: InsertTag): Promise<Tag>;
+  getAllTags(): Promise<Tag[]>;
+  addTagToIncident(incidentId: string, tagId: string): Promise<void>;
+  removeTagFromIncident(incidentId: string, tagId: string): Promise<void>;
+  getIncidentTags(incidentId: string): Promise<Tag[]>;
+  bulkTagIncidents(incidentIds: string[], tagId: string): Promise<void>;
+  addFavorite(userId: string, incidentId: string): Promise<void>;
+  removeFavorite(userId: string, incidentId: string): Promise<void>;
+  getFavorites(userId: string): Promise<string[]>;
+  getUnresolvedCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -58,6 +74,15 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(incidents)
       .set({ completedSteps: newCompleted })
+      .where(eq(incidents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async completeAllSteps(id: string, stepIndices: number[]): Promise<Incident | undefined> {
+    const [updated] = await db
+      .update(incidents)
+      .set({ completedSteps: stepIndices })
       .where(eq(incidents.id, id))
       .returning();
     return updated;
@@ -130,6 +155,75 @@ export class DatabaseStorage implements IStorage {
     guidanceArray[stepIndex] = guidance;
     const [updated] = await db.update(incidents).set({ stepGuidance: guidanceArray }).where(eq(incidents.id, id)).returning();
     return updated;
+  }
+
+  async bulkUpdateStatus(ids: string[], status: Incident["status"], userId: string): Promise<number> {
+    const result = await db.update(incidents).set({ status }).where(and(inArray(incidents.id, ids), eq(incidents.userId, userId))).returning();
+    return result.length;
+  }
+
+  async bulkDeleteIncidents(ids: string[], userId: string): Promise<number> {
+    const result = await db.delete(incidents).where(and(inArray(incidents.id, ids), eq(incidents.userId, userId))).returning();
+    return result.length;
+  }
+
+  async createTemplate(template: InsertTemplate): Promise<Template> {
+    const [created] = await db.insert(templates).values(template as any).returning();
+    return created;
+  }
+
+  async getTemplatesByUser(userId: string): Promise<Template[]> {
+    return db.select().from(templates).where(eq(templates.userId, userId)).orderBy(desc(templates.createdAt));
+  }
+
+  async deleteTemplate(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(templates).where(and(eq(templates.id, id), eq(templates.userId, userId))).returning();
+    return result.length > 0;
+  }
+
+  async createTag(tag: InsertTag): Promise<Tag> {
+    const [created] = await db.insert(tags).values(tag as any).returning();
+    return created;
+  }
+
+  async getAllTags(): Promise<Tag[]> {
+    return db.select().from(tags).orderBy(tags.name);
+  }
+
+  async addTagToIncident(incidentId: string, tagId: string): Promise<void> {
+    await db.insert(incidentTags).values({ incidentId, tagId }).onConflictDoNothing();
+  }
+
+  async removeTagFromIncident(incidentId: string, tagId: string): Promise<void> {
+    await db.delete(incidentTags).where(and(eq(incidentTags.incidentId, incidentId), eq(incidentTags.tagId, tagId)));
+  }
+
+  async getIncidentTags(incidentId: string): Promise<Tag[]> {
+    const result = await db.select({ tag: tags }).from(incidentTags).innerJoin(tags, eq(incidentTags.tagId, tags.id)).where(eq(incidentTags.incidentId, incidentId));
+    return result.map(r => r.tag);
+  }
+
+  async bulkTagIncidents(incidentIds: string[], tagId: string): Promise<void> {
+    const values = incidentIds.map(id => ({ incidentId: id, tagId }));
+    await db.insert(incidentTags).values(values).onConflictDoNothing();
+  }
+
+  async addFavorite(userId: string, incidentId: string): Promise<void> {
+    await db.insert(favorites).values({ userId, incidentId }).onConflictDoNothing();
+  }
+
+  async removeFavorite(userId: string, incidentId: string): Promise<void> {
+    await db.delete(favorites).where(and(eq(favorites.userId, userId), eq(favorites.incidentId, incidentId)));
+  }
+
+  async getFavorites(userId: string): Promise<string[]> {
+    const result = await db.select({ incidentId: favorites.incidentId }).from(favorites).where(eq(favorites.userId, userId));
+    return result.map(r => r.incidentId);
+  }
+
+  async getUnresolvedCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(eq(incidents.userId, userId), eq(incidents.status, "analyzing")));
+    return result[0]?.count || 0;
   }
 }
 

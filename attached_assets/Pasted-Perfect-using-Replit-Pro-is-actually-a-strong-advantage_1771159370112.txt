@@ -1,4 +1,4 @@
-Perfect — using **Replit Pro** is actually a strong advantage here because it lets you optimize for **speed, demoability, and deployment** instead of setup overhead.
+Perfect - using **Replit Pro** is actually a strong advantage here because it lets you optimize for **speed, demoability, and deployment** instead of setup overhead.
 
 Let’s redesign the plan specifically around what Replit gives you so you move fast and still look polished.
 
@@ -83,7 +83,7 @@ Judges LOVE this.
 
 ## 2️⃣ Built-in Secrets Manager
 
-Store API keys safely — looks professional.
+Store API keys safely - looks professional.
 
 ---
 
@@ -148,30 +148,30 @@ Replit helps you fake production-readiness very fast.
 
 # 🗓️ Replit-Optimized 5-Day Plan
 
-## Day 1 — Skeleton
+## Day 1 - Skeleton
 
 * Create Replit project
 * FastAPI endpoints
 * basic UI
 
-## Day 2 — AI reasoning
+## Day 2 - AI reasoning
 
 * parser
 * prompt tuning
 * structured outputs
 
-## Day 3 — UX polish
+## Day 3 - UX polish
 
 * cards
 * loading states
 * copy buttons
 
-## Day 4 — Demo engineering
+## Day 4 - Demo engineering
 
 * prepare 2–3 realistic logs
 * make outputs consistent
 
-## Day 5 — Submission assets
+## Day 5 - Submission assets
 
 * video
 * screenshots
@@ -222,4 +222,4 @@ If you want, next I can give you something that could massively increase your od
 🔥 **The 3 features that LOOK hard but are easy to build**
 🔥 **How to make this qualify for BOTH Kilo tracks automatically**
 
-Say the word — this is where we turn it from good → dangerous.
+Say the word - this is where we turn it from good → dangerous.

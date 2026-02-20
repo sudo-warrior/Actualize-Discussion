@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import type { Incident } from "@shared/schema";
 import { useRoute, useLocation } from "wouter";
@@ -40,7 +40,9 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  MessageSquare
+  MessageSquare,
+  Download,
+  Link2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -54,6 +56,7 @@ export default function IncidentDetail() {
   const [guidanceData, setGuidanceData] = useState<Record<number, string>>({});
   const [loadingGuidance, setLoadingGuidance] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<Incident>({
     queryKey: [`/api/incidents/${incidentId}`],
@@ -73,17 +76,17 @@ export default function IncidentDetail() {
     onSuccess: (updatedIncident) => {
       queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
-      
+
       // Auto-update status based on completion
       const completedCount = updatedIncident.completedSteps?.length || 0;
       const totalSteps = updatedIncident.nextSteps.length;
-      
+
       if (completedCount === totalSteps && updatedIncident.status !== "resolved") {
         // All steps completed, mark as resolved
         statusMutation.mutate("resolved");
-        toast({ 
-          title: "All steps completed!", 
-          description: "Incident marked as resolved." 
+        toast({
+          title: "All steps completed!",
+          description: "Incident marked as resolved."
         });
       } else if (completedCount > 0 && updatedIncident.status === "resolved") {
         // Steps uncompleted, revert to analyzing
@@ -108,8 +111,8 @@ export default function IncidentDetail() {
       const res = await apiRequest("PATCH", `/api/incidents/${incidentId}/status`, { status });
       return res.json() as Promise<Incident>;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}`] });
+    onSuccess: (updatedIncident) => {
+      queryClient.setQueryData([`/api/incidents/${incidentId}`], updatedIncident);
       queryClient.invalidateQueries({ queryKey: ["/api/incidents"] });
     },
   });
@@ -445,13 +448,12 @@ export default function IncidentDetail() {
                     key={s}
                     data-testid={`button-status-${s}`}
                     onClick={() => statusMutation.mutate(s)}
-                    className={`w-full text-left px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider transition-colors border ${
-                      incident.status === s
-                        ? s === "resolved" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
-                          : s === "critical" ? "bg-red-500/20 border-red-500/30 text-red-400"
+                    className={`w-full text-left px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider transition-colors border ${incident.status === s
+                      ? s === "resolved" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
+                        : s === "critical" ? "bg-red-500/20 border-red-500/30 text-red-400"
                           : "bg-blue-500/20 border-blue-500/30 text-blue-400"
-                        : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                    }`}
+                      : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                      }`}
                   >
                     {s === "resolved" && <CheckCircle2 className="h-3 w-3 inline mr-2" />}
                     {s === "critical" && <AlertTriangle className="h-3 w-3 inline mr-2" />}
@@ -472,6 +474,65 @@ export default function IncidentDetail() {
               <Trash2 className="mr-2 h-3 w-3" />
               {deleteMutation.isPending ? "DELETING..." : "DELETE INCIDENT"}
             </Button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const url = `${window.location.origin}/incidents/${incident.id}`;
+                  navigator.clipboard.writeText(url);
+                  toast({ title: "Link copied to clipboard" });
+                }}
+                className="font-mono text-xs"
+              >
+                <Link2 className="mr-2 h-3 w-3" />
+                COPY LINK
+              </Button>
+              <Button
+                variant="outline"
+                disabled={isExporting}
+                onClick={async () => {
+                  setIsExporting(true);
+                  try {
+                    const authHeaders = await getAuthHeaders();
+                    const res = await fetch(`/api/incidents/${incident.id}/export/pdf`, {
+                      headers: authHeaders,
+                      credentials: 'include'
+                    });
+
+                    if (!res.ok) {
+                      const errorData = await res.json().catch(() => ({}));
+                      throw new Error(errorData.message || 'Export failed');
+                    }
+
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `incident-${incident.id}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast({ title: "PDF exported successfully" });
+                  } catch (error: any) {
+                    toast({
+                      title: "Export failed",
+                      description: error.message,
+                      variant: "destructive"
+                    });
+                  } finally {
+                    setIsExporting(false);
+                  }
+                }}
+                className="font-mono text-xs"
+              >
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-3 w-3" />
+                )}
+                {isExporting ? "EXPORTING..." : "EXPORT PDF"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

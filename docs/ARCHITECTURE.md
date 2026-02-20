@@ -68,7 +68,7 @@ For even better performance, you could:
   evidence: string[]
   nextSteps: string[]
   completedSteps: number[]
-  stepGuidance: string[]  // NEW: Cached guidance per step
+  stepGuidance: string[]  // Cached guidance per step
   createdAt: Date
 }
 ```
@@ -82,7 +82,49 @@ For even better performance, you could:
   keyHash: string
   keyPrefix: string
   revoked: boolean
+  requestCount: number
+  lastResetDate: Date
   lastUsedAt: Date
+  createdAt: Date
+}
+```
+
+### Templates Table
+```typescript
+{
+  id: string
+  userId: string
+  name: string
+  description: string
+  category: string
+  sampleLogs: string
+  createdAt: Date
+}
+```
+
+### Tags Table
+```typescript
+{
+  id: string
+  name: string
+  color: string (hex)
+  createdAt: Date
+}
+```
+
+### Incident Tags (Junction)
+```typescript
+{
+  incidentId: string
+  tagId: string
+}
+```
+
+### Favorites Table
+```typescript
+{
+  userId: string
+  incidentId: string
   createdAt: Date
 }
 ```
@@ -97,9 +139,48 @@ For even better performance, you could:
 - `PATCH /api/incidents/:id/steps/:stepIndex` - Toggle step completion
 - `POST /api/incidents/:id/steps/:stepIndex/guidance` - Get/generate guidance
 - `DELETE /api/incidents/:id` - Delete incident
+- `GET /api/incidents/stats/summary` - Get incident statistics
+- `GET /api/incidents/count/unresolved` - Get unresolved count
+
+### Bulk Operations
+- `POST /api/incidents/bulk/status` - Bulk update status
+- `POST /api/incidents/bulk/delete` - Bulk delete incidents
+- `POST /api/incidents/bulk/tag` - Bulk add tags
+
+### PDF Export
+- `GET /api/incidents/:id/export/pdf` - Export single incident PDF
+- `POST /api/incidents/export/bulk` - Export multiple incidents as merged PDF
+
+### API Key Management
 - `POST /api/keys` - Create API key
 - `GET /api/keys` - List API keys
 - `DELETE /api/keys/:id` - Revoke API key
+
+### Templates
+- `POST /api/templates` - Create template
+- `GET /api/templates` - List user's templates
+- `DELETE /api/templates/:id` - Delete template
+
+### Tags
+- `POST /api/tags` - Create tag
+- `GET /api/tags` - List all tags
+- `POST /api/incidents/:id/tags` - Add tag to incident
+- `DELETE /api/incidents/:id/tags/:tagId` - Remove tag from incident
+- `GET /api/incidents/:id/tags` - Get tags for incident
+
+### Favorites
+- `POST /api/favorites` - Add to favorites
+- `DELETE /api/favorites/:incidentId` - Remove from favorites
+- `GET /api/favorites` - Get favorite incident IDs
+
+### User Profile
+- `PATCH /api/user/profile` - Update user profile (username, firstName, lastName, phone, dob)
+
+### Chat/Conversations
+- `POST /api/chat/conversations` - Create conversation
+- `GET /api/chat/conversations` - List conversations (by incident or user)
+- `GET /api/chat/conversations/:id/messages` - Get messages
+- `POST /api/chat/conversations/:id/messages` - Add message
 
 ### API Key-Based (Bearer token)
 - `POST /api/v1/incidents/analyze` - Analyze logs
@@ -108,22 +189,36 @@ For even better performance, you could:
 - `PATCH /api/v1/incidents/:id/status` - Update status
 - `DELETE /api/v1/incidents/:id` - Delete incident
 
+## Rate Limiting
+
+### API Key Rate Limiting (Implemented)
+- **Limit**: 100 requests per day per API key
+- **Reset**: Automatic reset every 24 hours
+- **Headers**: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
+
+### Session-Based Rate Limiting (Not Implemented)
+- Not currently implemented for user sessions
+- Consider adding express-rate-limit
+
 ## Security Notes
 
 1. **API Keys**: Stored as SHA-256 hashes, never plain text
 2. **Tokens**: Cached with TTL, invalidated on auth errors
 3. **Prompts**: Server-side only, never sent to client
 4. **User Isolation**: All queries filtered by userId
-5. **Rate Limiting**: Not implemented (consider adding)
+5. **API Key Rate Limiting**: 100 requests/day per key (implemented)
 
 ## Recommendations
 
-### Immediate
-- ✅ Token caching (done)
-- ✅ Guidance caching (done)
+### Implemented
+- ✅ Token caching (5 min TTL)
+- ✅ Guidance caching (per-step)
+- ✅ API key rate limiting (100/day)
+- ✅ User isolation on all endpoints
+- ✅ Server-side prompt security
 
 ### Future Enhancements
-- Add rate limiting (express-rate-limit)
+- Add session-based rate limiting (express-rate-limit)
 - Add request logging/monitoring
 - Implement JWT verification for zero-latency auth
 - Add guidance regeneration option (force refresh)

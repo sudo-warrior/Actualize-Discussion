@@ -2,10 +2,10 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { createHash, randomBytes } from "crypto";
 import { storage } from "./storage";
-import { analyzeLogsSchema } from "@shared/schema";
+import { analyzeLogsSchema, type Incident } from "@shared/schema";
 import { analyzeLogs, getStepGuidance } from "./analyzer";
 import { isAuthenticated } from "./auth";
-import { registerChatRoutes } from "./replit_integrations/chat";
+import { registerChatRoutes, chatStorage } from "./replit_integrations/chat";
 
 function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
@@ -36,7 +36,7 @@ async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
   const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
 
   let currentCount = apiKey.requestCount;
-  
+
   // Reset if 24 hours passed
   if (hoursSinceReset >= 24) {
     currentCount = 0;
@@ -44,7 +44,7 @@ async function apiKeyAuth(req: any, res: Response, next: NextFunction) {
 
   if (currentCount >= DAILY_LIMIT) {
     const hoursUntilReset = Math.ceil(24 - hoursSinceReset);
-    return res.status(429).json({ 
+    return res.status(429).json({
       error: "Rate limit exceeded. You have reached the daily limit of 100 requests.",
       limit: DAILY_LIMIT,
       remaining: 0,
@@ -68,7 +68,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
   // Register chat routes
   registerChatRoutes(app, isAuthenticated);
 
@@ -141,6 +141,13 @@ export async function registerRoutes(
     if (incident.userId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
+
+    // Auto-complete all steps when marking as resolved
+    if (status === "resolved" && incident.nextSteps.length > 0) {
+      const allSteps = Array.from({ length: incident.nextSteps.length }, (_, i) => i);
+      await storage.completeAllSteps(req.params.id as string, allSteps);
+    }
+
     const updated = await storage.updateIncidentStatus(req.params.id as string, status);
     return res.json(updated);
   });
@@ -181,22 +188,22 @@ export async function registerRoutes(
     if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= incident.nextSteps.length) {
       return res.status(400).json({ message: "Invalid step index" });
     }
-    
+
     // Return cached guidance if available
     if (incident.stepGuidance?.[stepIndex]) {
       return res.json({ guidance: incident.stepGuidance[stepIndex], cached: true });
     }
-    
+
     try {
       const guidance = await getStepGuidance(incident.nextSteps[stepIndex], {
         rootCause: incident.rootCause,
         fix: incident.fix,
         rawLogs: incident.rawLogs.slice(0, 2000),
       });
-      
+
       // Save guidance to DB
       await storage.saveStepGuidance(req.params.id as string, stepIndex, guidance);
-      
+
       return res.json({ guidance, cached: false });
     } catch (error) {
       console.error("Guidance error:", error);
@@ -334,9 +341,9 @@ export async function registerRoutes(
   app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
     const userId = req.user.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
-    
+
     const { username, firstName, lastName, phone, dob } = req.body;
-    
+
     try {
       const { supabase } = await import("./supabase");
       const { data, error } = await supabase.auth.admin.updateUserById(userId, {
@@ -348,12 +355,226 @@ export async function registerRoutes(
           dob
         }
       });
-      
+
       if (error) throw error;
       return res.json({ success: true, user: data.user });
     } catch (error) {
       console.error("Profile update error:", error);
       return res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // === Templates ===
+  app.post("/api/templates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { name, description, category, sampleLogs } = req.body;
+    if (!name || !category || !sampleLogs) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    const template = await storage.createTemplate({ userId, name, description, category, sampleLogs });
+    return res.status(201).json(template);
+  });
+
+  app.get("/api/templates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const templates = await storage.getTemplatesByUser(userId);
+    return res.json(templates);
+  });
+
+  app.delete("/api/templates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const deleted = await storage.deleteTemplate(req.params.id, userId);
+    if (!deleted) return res.status(404).json({ message: "Template not found" });
+    return res.json({ success: true });
+  });
+
+  // === Tags ===
+  app.post("/api/tags", isAuthenticated, async (req: any, res) => {
+    const { name, color } = req.body;
+    if (!name) return res.status(400).json({ message: "Tag name required" });
+    const tag = await storage.createTag({ name, color: color || "#3b82f6" });
+    return res.status(201).json(tag);
+  });
+
+  app.get("/api/tags", isAuthenticated, async (req: any, res) => {
+    const tags = await storage.getAllTags();
+    return res.json(tags);
+  });
+
+  app.post("/api/incidents/:id/tags", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    const { tagId } = req.body;
+    if (!tagId) return res.status(400).json({ message: "Tag ID required" });
+    await storage.addTagToIncident(req.params.id, tagId);
+    return res.json({ success: true });
+  });
+
+  app.delete("/api/incidents/:id/tags/:tagId", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    await storage.removeTagFromIncident(req.params.id, req.params.tagId);
+    return res.json({ success: true });
+  });
+
+  app.get("/api/incidents/:id/tags", isAuthenticated, async (req: any, res) => {
+    const tags = await storage.getIncidentTags(req.params.id);
+    return res.json(tags);
+  });
+
+  // === Favorites ===
+  app.post("/api/favorites", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { incidentId } = req.body;
+    if (!incidentId) return res.status(400).json({ message: "Incident ID required" });
+    await storage.addFavorite(userId, incidentId);
+    return res.json({ success: true });
+  });
+
+  app.delete("/api/favorites/:incidentId", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    await storage.removeFavorite(userId, req.params.incidentId);
+    return res.json({ success: true });
+  });
+
+  app.get("/api/favorites", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const favorites = await storage.getFavorites(userId);
+    return res.json(favorites);
+  });
+
+  // === Bulk Actions ===
+  app.post("/api/incidents/bulk/status", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { ids, status } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Incident IDs required" });
+    }
+    if (!["analyzing", "resolved", "critical"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    const count = await storage.bulkUpdateStatus(ids, status, userId);
+    return res.json({ success: true, count });
+  });
+
+  app.post("/api/incidents/bulk/delete", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Incident IDs required" });
+    }
+    const count = await storage.bulkDeleteIncidents(ids, userId);
+    return res.json({ success: true, count });
+  });
+
+  app.post("/api/incidents/bulk/tag", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { ids, tagId } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Incident IDs required" });
+    }
+    if (!tagId) return res.status(400).json({ message: "Tag ID required" });
+    await storage.bulkTagIncidents(ids, tagId);
+    return res.json({ success: true });
+  });
+
+  // === Unresolved Count ===
+  app.get("/api/incidents/count/unresolved", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const count = await storage.getUnresolvedCount(userId);
+    return res.json({ count });
+  });
+
+  // === PDF Export ===
+  app.get("/api/incidents/:id/export/pdf", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+
+    try {
+      // Fetch follow-up conversations for this incident
+      const convs = await chatStorage.getConversationsByIncident(req.params.id);
+      const conversationsWithMessages = await Promise.all(
+        convs.map(async (conv) => ({
+          ...conv,
+          messages: await chatStorage.getMessagesByConversation(conv.id)
+        }))
+      );
+
+      const { generateIncidentPDF } = await import("./foxit-pdf");
+      const limitMessages = req.query.limit ? parseInt(req.query.limit as string) : 5;
+      const pdfBuffer = await generateIncidentPDF(incident, conversationsWithMessages, { limitMessages });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="incident-${incident.id}.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      return res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("PDF generation error:", error);
+      const message = error.message.includes('not configured')
+        ? "PDF Export is not configured on the server."
+        : "Failed to generate PDF report.";
+      return res.status(500).json({ message });
+    }
+  });
+
+  // Bulk PDF Export - Merge multiple incidents
+  app.post("/api/incidents/export/bulk", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Incident IDs required" });
+    }
+
+    try {
+      const incidents = await Promise.all(
+        ids.map(id => storage.getIncident(id))
+      );
+
+      const validIncidents = incidents.filter(
+        inc => inc && inc.userId === userId
+      ) as Incident[];
+
+      if (validIncidents.length === 0) {
+        return res.status(404).json({ message: "No valid incidents found" });
+      }
+
+      const { mergeIncidentPDFs } = await import("./foxit-pdf");
+      const pdfBuffer = await mergeIncidentPDFs(validIncidents);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="incidents-report-${Date.now()}.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      return res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("Bulk PDF error:", error);
+      const message = error.message.includes('not configured')
+        ? "PDF Export is not configured on the server."
+        : "Failed to generate bulk PDF report.";
+      return res.status(500).json({ message });
     }
   });
 
@@ -391,10 +612,10 @@ export async function registerRoutes(
 
   app.get("/api/v1/incidents", apiKeyAuth, async (req: any, res) => {
     const incidents = await storage.getIncidentsByUser(req.apiUserId);
-    return res.json({ 
+    return res.json({
       success: true,
-      data: incidents, 
-      total: incidents.length 
+      data: incidents,
+      total: incidents.length
     });
   });
 
@@ -428,7 +649,7 @@ export async function registerRoutes(
     if (!incident) return res.status(404).json({ error: "Incident not found." });
     if (incident.userId !== req.apiUserId) return res.status(403).json({ error: "Forbidden." });
     await storage.deleteIncident(req.params.id as string);
-    return res.json({ 
+    return res.json({
       success: true,
       message: "Incident deleted successfully"
     });
