@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +21,9 @@ import {
   Edit,
   Activity,
   Zap,
-  Check
+  Check,
+  Bell,
+  Mail
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -74,6 +76,9 @@ export default function Profile() {
     dob: user?.user_metadata?.dob || "",
   });
   const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [criticalAlerts, setCriticalAlerts] = useState(true);
+  const [resolvedAlerts, setResolvedAlerts] = useState(false);
 
   const { data: incidents = [] } = useQuery<Incident[]>({
     queryKey: ["/api/incidents"],
@@ -82,6 +87,39 @@ export default function Profile() {
   const { data: apiKeys = [] } = useQuery<ApiKeyInfo[]>({
     queryKey: ["/api/keys"],
   });
+
+  const { data: notificationPrefs } = useQuery<{
+    email: string;
+    criticalAlerts: boolean;
+    resolvedAlerts: boolean;
+    digestFrequency: string;
+  }>({
+    queryKey: ["/api/user/notifications"],
+  });
+
+  const saveNotificationsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/user/notifications", {
+        email: notificationEmail,
+        criticalAlerts,
+        resolvedAlerts,
+        digestFrequency: "none",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/notifications"] });
+      toast({ title: "Notification preferences saved!" });
+    },
+  });
+
+  useEffect(() => {
+    if (notificationPrefs) {
+      setNotificationEmail(notificationPrefs.email || "");
+      setCriticalAlerts(notificationPrefs.criticalAlerts ?? true);
+      setResolvedAlerts(notificationPrefs.resolvedAlerts ?? false);
+    }
+  }, [notificationPrefs]);
 
   const createKeyMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -104,10 +142,6 @@ export default function Profile() {
       setKeyToRevoke(null);
     },
   });
-
-  const toggleKeyVisibility = (keyId: string) => {
-    setShowKeys(prev => ({ ...prev, [keyId]: !prev[keyId] }));
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -517,6 +551,73 @@ export default function Profile() {
                 )}
               </Card>
             </div>
+
+            {/* Email Notifications */}
+            <Card className="bg-[#161b22] border-gray-800 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-blue-400" />
+                    Email Notifications
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">Receive alerts when incidents are created or resolved</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-400 text-sm">Email Address</Label>
+                  <div className="flex gap-2 mt-1">
+                    <div className="relative flex-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <Input
+                        type="email"
+                        value={notificationEmail}
+                        onChange={(e) => setNotificationEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        className="pl-10 bg-gray-800 border-gray-700 text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white">Critical Incidents</p>
+                      <p className="text-xs text-gray-500">Get notified when critical incidents are detected</p>
+                    </div>
+                    <button
+                      onClick={() => setCriticalAlerts(!criticalAlerts)}
+                      className={`w-12 h-6 rounded-full transition-colors ${criticalAlerts ? 'bg-blue-600' : 'bg-gray-700'}`}
+                    >
+                      <div className={`w-5 h-5 rounded-full bg-white transition-transform ${criticalAlerts ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white">Resolved Incidents</p>
+                      <p className="text-xs text-gray-500">Get notified when incidents are resolved</p>
+                    </div>
+                    <button
+                      onClick={() => setResolvedAlerts(!resolvedAlerts)}
+                      className={`w-12 h-6 rounded-full transition-colors ${resolvedAlerts ? 'bg-blue-600' : 'bg-gray-700'}`}
+                    >
+                      <div className={`w-5 h-5 rounded-full bg-white transition-transform ${resolvedAlerts ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => saveNotificationsMutation.mutate()}
+                  disabled={saveNotificationsMutation.isPending || !notificationEmail}
+                  className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
+                >
+                  {saveNotificationsMutation.isPending ? 'Saving...' : 'Save Preferences'}
+                </Button>
+              </div>
+            </Card>
 
             {/* Right Column - Recent Activity */}
             <div className="lg:col-span-1">

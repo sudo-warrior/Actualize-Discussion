@@ -1,5 +1,5 @@
-import { type Incident, type InsertIncident, incidents, type ApiKey, type InsertApiKey, apiKeys, type Template, type InsertTemplate, templates, type Tag, type InsertTag, tags, incidentTags, favorites } from "@shared/schema";
-import { desc, eq, and, sql, inArray } from "drizzle-orm";
+import { type Incident, type InsertIncident, incidents, type ApiKey, type InsertApiKey, apiKeys, type Template, type InsertTemplate, templates, type Tag, type InsertTag, tags, incidentTags, favorites, type Comment, type InsertComment, comments, type ActivityLog, type InsertActivityLog, activityLog, type UserRole, type InsertUserRole, userRoles, type IncidentAssignment, type InsertIncidentAssignment, incidentAssignments, type NotificationPreferences, type InsertNotificationPreferences, notificationPreferences } from "@shared/schema";
+import { desc, eq, and, sql, inArray, asc } from "drizzle-orm";
 import { db } from "./db";
 
 export interface IStorage {
@@ -34,6 +34,19 @@ export interface IStorage {
   removeFavorite(userId: string, incidentId: string): Promise<void>;
   getFavorites(userId: string): Promise<string[]>;
   getUnresolvedCount(userId: string): Promise<number>;
+  createComment(comment: InsertComment): Promise<Comment>;
+  getCommentsByIncident(incidentId: string): Promise<Comment[]>;
+  updateComment(id: string, content: string): Promise<Comment | undefined>;
+  deleteComment(id: string, userId: string): Promise<boolean>;
+  logActivity(activity: InsertActivityLog): Promise<ActivityLog>;
+  getActivityByIncident(incidentId: string): Promise<ActivityLog[]>;
+  getUserRole(userId: string): Promise<UserRole | undefined>;
+  setUserRole(userId: string, role: UserRole["role"]): Promise<UserRole>;
+  assignIncident(assignment: InsertIncidentAssignment): Promise<void>;
+  getIncidentAssignment(incidentId: string): Promise<IncidentAssignment | undefined>;
+  removeIncidentAssignment(incidentId: string): Promise<boolean>;
+  getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
+  setNotificationPreferences(prefs: InsertNotificationPreferences): Promise<NotificationPreferences>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -224,6 +237,96 @@ export class DatabaseStorage implements IStorage {
   async getUnresolvedCount(userId: string): Promise<number> {
     const result = await db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(eq(incidents.userId, userId), eq(incidents.status, "analyzing")));
     return result[0]?.count || 0;
+  }
+
+  async createComment(comment: InsertComment): Promise<Comment> {
+    const [created] = await db.insert(comments).values(comment as any).returning();
+    return created;
+  }
+
+  async getCommentsByIncident(incidentId: string): Promise<Comment[]> {
+    return db.select().from(comments).where(eq(comments.incidentId, incidentId)).orderBy(asc(comments.createdAt));
+  }
+
+  async updateComment(id: string, content: string): Promise<Comment | undefined> {
+    const [updated] = await db.update(comments).set({ content, updatedAt: new Date() }).where(eq(comments.id, id)).returning();
+    return updated;
+  }
+
+  async deleteComment(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(comments).where(and(eq(comments.id, id), eq(comments.userId, userId))).returning();
+    return result.length > 0;
+  }
+
+  async logActivity(activity: InsertActivityLog): Promise<ActivityLog> {
+    const [created] = await db.insert(activityLog).values(activity as any).returning();
+    return created;
+  }
+
+  async getActivityByIncident(incidentId: string): Promise<ActivityLog[]> {
+    return db.select().from(activityLog).where(eq(activityLog.incidentId, incidentId)).orderBy(desc(activityLog.createdAt));
+  }
+
+  async getUserRole(userId: string): Promise<UserRole | undefined> {
+    const [role] = await db.select().from(userRoles).where(eq(userRoles.userId, userId));
+    return role;
+  }
+
+  async setUserRole(userId: string, role: UserRole["role"]): Promise<UserRole> {
+    const existing = await this.getUserRole(userId);
+    if (existing) {
+      const [updated] = await db.update(userRoles).set({ role }).where(eq(userRoles.userId, userId)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(userRoles).values({ userId, role } as any).returning();
+    return created;
+  }
+
+  async assignIncident(assignment: InsertIncidentAssignment): Promise<void> {
+    await db.insert(incidentAssignments).values(assignment).onConflictDoUpdate({
+      target: incidentAssignments.incidentId,
+      set: { assignedTo: assignment.assignedTo, assignedBy: assignment.assignedBy, createdAt: new Date() }
+    });
+  }
+
+  async getIncidentAssignment(incidentId: string): Promise<IncidentAssignment | undefined> {
+    const [assignment] = await db.select().from(incidentAssignments).where(eq(incidentAssignments.incidentId, incidentId));
+    return assignment;
+  }
+
+  async removeIncidentAssignment(incidentId: string): Promise<boolean> {
+    const result = await db.delete(incidentAssignments).where(eq(incidentAssignments.incidentId, incidentId)).returning();
+    return result.length > 0;
+  }
+
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
+    const [prefs] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+    return prefs;
+  }
+
+  async setNotificationPreferences(prefs: InsertNotificationPreferences): Promise<NotificationPreferences> {
+    const existing = await this.getNotificationPreferences(prefs.userId);
+    if (existing) {
+      const [updated] = await db.update(notificationPreferences)
+        .set({ 
+          email: prefs.email, 
+          criticalAlerts: prefs.criticalAlerts,
+          resolvedAlerts: prefs.resolvedAlerts,
+          digestFrequency: prefs.digestFrequency as "none" | "daily" | "weekly",
+          updatedAt: new Date() 
+        })
+        .where(eq(notificationPreferences.userId, prefs.userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(notificationPreferences).values({
+      userId: prefs.userId,
+      email: prefs.email,
+      criticalAlerts: prefs.criticalAlerts,
+      resolvedAlerts: prefs.resolvedAlerts,
+      digestFrequency: prefs.digestFrequency as "none" | "daily" | "weekly",
+    } as any).returning();
+    return created;
   }
 }
 

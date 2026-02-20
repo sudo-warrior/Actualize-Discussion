@@ -6,6 +6,8 @@ import { analyzeLogsSchema, type Incident } from "@shared/schema";
 import { analyzeLogs, getStepGuidance } from "./analyzer";
 import { isAuthenticated } from "./auth";
 import { registerChatRoutes, chatStorage } from "./replit_integrations/chat";
+import { sendCriticalIncidentAlert, sendIncidentResolvedNotification } from "./notifications";
+import { z } from "zod";
 
 function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
@@ -100,6 +102,19 @@ export async function registerRoutes(
         userId,
       });
 
+      // Send email notification for critical incidents
+      if (analysis.severity === "critical") {
+        const prefs = await storage.getNotificationPreferences(userId);
+        if (prefs?.criticalAlerts && prefs.email) {
+          sendCriticalIncidentAlert(prefs.email, {
+            id: incident.id,
+            title: incident.title,
+            severity: incident.severity,
+            rootCause: incident.rootCause,
+          });
+        }
+      }
+
       return res.status(201).json(incident);
     } catch (error) {
       console.error("Analysis error:", error);
@@ -149,6 +164,19 @@ export async function registerRoutes(
     }
 
     const updated = await storage.updateIncidentStatus(req.params.id as string, status);
+
+    // Send notification when incident is resolved
+    if (status === "resolved" && updated) {
+      const prefs = await storage.getNotificationPreferences(userId);
+      if (prefs?.resolvedAlerts && prefs.email) {
+        sendIncidentResolvedNotification(prefs.email, {
+          id: updated.id,
+          title: updated.title,
+          severity: updated.severity,
+        });
+      }
+    }
+
     return res.json(updated);
   });
 
@@ -653,6 +681,167 @@ export async function registerRoutes(
       success: true,
       message: "Incident deleted successfully"
     });
+  });
+
+  // === Comments ===
+  app.post("/api/incidents/:id/comments", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    const { content } = req.body;
+    if (!content || typeof content !== "string" || content.trim().length === 0) {
+      return res.status(400).json({ message: "Comment content required" });
+    }
+    const comment = await storage.createComment({
+      incidentId: req.params.id,
+      userId,
+      content: content.trim()
+    });
+    await storage.logActivity({
+      incidentId: req.params.id,
+      userId,
+      action: "comment_added",
+      details: "Added a comment"
+    });
+    return res.status(201).json(comment);
+  });
+
+  app.get("/api/incidents/:id/comments", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    const comments = await storage.getCommentsByIncident(req.params.id);
+    return res.json(comments);
+  });
+
+  app.patch("/api/comments/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { content } = req.body;
+    if (!content || typeof content !== "string" || content.trim().length === 0) {
+      return res.status(400).json({ message: "Comment content required" });
+    }
+    const updated = await storage.updateComment(req.params.id, content.trim());
+    if (!updated) return res.status(404).json({ message: "Comment not found" });
+    return res.json(updated);
+  });
+
+  app.delete("/api/comments/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const deleted = await storage.deleteComment(req.params.id, userId);
+    if (!deleted) return res.status(404).json({ message: "Comment not found" });
+    return res.json({ success: true });
+  });
+
+  // === Activity Log / Timeline ===
+  app.get("/api/incidents/:id/activity", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    const activities = await storage.getActivityByIncident(req.params.id);
+    return res.json(activities);
+  });
+
+  // === User Roles ===
+  app.get("/api/user/role", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const role = await storage.getUserRole(userId);
+    return res.json(role || { userId, role: "operator" });
+  });
+
+  app.patch("/api/user/role", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { role } = req.body;
+    if (!["admin", "operator", "viewer"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+    const userRole = await storage.setUserRole(userId, role);
+    return res.json(userRole);
+  });
+
+  // === Notification Preferences ===
+  app.get("/api/user/notifications", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const prefs = await storage.getNotificationPreferences(userId);
+    return res.json(prefs || { userId, email: "", criticalAlerts: true, resolvedAlerts: false, digestFrequency: "none" });
+  });
+
+  app.post("/api/user/notifications", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { email, criticalAlerts, resolvedAlerts, digestFrequency } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    const prefs = await storage.setNotificationPreferences({
+      userId,
+      email,
+      criticalAlerts: criticalAlerts ?? true,
+      resolvedAlerts: resolvedAlerts ?? false,
+      digestFrequency: digestFrequency ?? "none",
+    });
+    return res.json(prefs);
+  });
+
+  // === Incident Assignments ===
+  app.post("/api/incidents/:id/assign", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    const { assignedTo } = req.body;
+    if (!assignedTo || typeof assignedTo !== "string") {
+      return res.status(400).json({ message: "assignedTo user ID required" });
+    }
+    await storage.assignIncident({
+      incidentId: req.params.id,
+      assignedTo,
+      assignedBy: userId
+    });
+    await storage.logActivity({
+      incidentId: req.params.id,
+      userId,
+      action: "assigned",
+      details: `Assigned to user ${assignedTo}`
+    });
+    return res.json({ success: true });
+  });
+
+  app.get("/api/incidents/:id/assign", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    const assignment = await storage.getIncidentAssignment(req.params.id);
+    return res.json(assignment || null);
+  });
+
+  app.delete("/api/incidents/:id/assign", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const incident = await storage.getIncident(req.params.id);
+    if (!incident || incident.userId !== userId) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+    await storage.removeIncidentAssignment(req.params.id);
+    return res.json({ success: true });
   });
 
   return httpServer;
