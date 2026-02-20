@@ -3,6 +3,7 @@ import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -42,9 +43,32 @@ import {
   ChevronUp,
   MessageSquare,
   Download,
-  Link2
+  Link2,
+  Send,
+  User,
+  Calendar,
+  Edit2,
+  Trash
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+interface Comment {
+  id: string;
+  incidentId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+interface ActivityLog {
+  id: string;
+  incidentId: string;
+  userId: string;
+  action: string;
+  details: string | null;
+  createdAt: string;
+}
 
 export default function IncidentDetail() {
   const { toast } = useToast();
@@ -57,10 +81,25 @@ export default function IncidentDetail() {
   const [loadingGuidance, setLoadingGuidance] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [showComments, setShowComments] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<Incident>({
     queryKey: [`/api/incidents/${incidentId}`],
     enabled: !!incidentId,
+  });
+
+  const { data: comments = [] } = useQuery<Comment[]>({
+    queryKey: [`/api/incidents/${incidentId}/comments`],
+    enabled: !!incidentId && showComments,
+  });
+
+  const { data: activities = [] } = useQuery<ActivityLog[]>({
+    queryKey: [`/api/incidents/${incidentId}/activity`],
+    enabled: !!incidentId && showTimeline,
   });
 
   if (error && isUnauthorizedError(error as Error)) {
@@ -135,6 +174,42 @@ export default function IncidentDetail() {
       setLoadingGuidance(null);
     }
   };
+
+  const addCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await apiRequest("POST", `/api/incidents/${incidentId}/comments`, { content });
+      return res.json() as Promise<Comment>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}/comments`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}/activity`] });
+      setNewComment("");
+      toast({ title: "Comment added" });
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const res = await apiRequest("PATCH", `/api/comments/${id}`, { content });
+      return res.json() as Promise<Comment>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}/comments`] });
+      setEditingCommentId(null);
+      setEditingContent("");
+      toast({ title: "Comment updated" });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/comments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/incidents/${incidentId}/comments`] });
+      toast({ title: "Comment deleted" });
+    },
+  });
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -533,6 +608,150 @@ export default function IncidentDetail() {
                 {isExporting ? "EXPORTING..." : "EXPORT PDF"}
               </Button>
             </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowTimeline(!showTimeline)}
+                className={`font-mono text-xs ${showTimeline ? 'bg-primary/10 border-primary/30' : ''}`}
+              >
+                <Calendar className="mr-2 h-3 w-3" />
+                TIMELINE
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowComments(!showComments)}
+                className={`font-mono text-xs ${showComments ? 'bg-primary/10 border-primary/30' : ''}`}
+              >
+                <MessageSquare className="mr-2 h-3 w-3" />
+                COMMENTS
+              </Button>
+            </div>
+
+            {showTimeline && (
+              <Card className="p-4 border-border bg-card/50">
+                <div className="flex items-center gap-2 mb-4">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider">Activity Timeline</h3>
+                </div>
+                {activities.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No activity yet</p>
+                ) : (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                    {activities.map((activity) => (
+                      <div key={activity.id} className="flex gap-3 text-xs">
+                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground">
+                            <span className="font-mono text-primary">{activity.action.replace(/_/g, ' ')}</span>
+                            {activity.details && <span className="text-muted-foreground"> - {activity.details}</span>}
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {showComments && (
+              <Card className="p-4 border-border bg-card/50">
+                <div className="flex items-center gap-2 mb-4">
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-wider">Comments</h3>
+                </div>
+                
+                <div className="space-y-3 mb-4 max-h-[200px] overflow-y-auto">
+                  {comments.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No comments yet. Add the first comment below.</p>
+                  ) : (
+                    comments.map((comment) => (
+                      <div key={comment.id} className="bg-muted/30 rounded-lg p-3">
+                        {editingCommentId === comment.id ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editingContent}
+                              onChange={(e) => setEditingContent(e.target.value)}
+                              className="text-xs min-h-[60px]"
+                              placeholder="Edit comment..."
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => updateCommentMutation.mutate({ id: comment.id, content: editingContent })}
+                                disabled={updateCommentMutation.isPending}
+                                className="text-xs h-7"
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { setEditingCommentId(null); setEditingContent(""); }}
+                                className="text-xs h-7"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs text-foreground whitespace-pre-wrap">{comment.content}</p>
+                              <div className="flex gap-1 shrink-0">
+                                <button
+                                  onClick={() => { setEditingCommentId(comment.id); setEditingContent(comment.content); }}
+                                  className="text-muted-foreground hover:text-foreground h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => deleteCommentMutation.mutate(comment.id)}
+                                  className="text-muted-foreground hover:text-red-500 h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
+                                >
+                                  <Trash className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-2">
+                              {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="text-xs min-h-[60px] resize-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (newComment.trim()) {
+                          addCommentMutation.mutate(newComment.trim());
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={() => addCommentMutation.mutate(newComment.trim())}
+                    disabled={!newComment.trim() || addCommentMutation.isPending}
+                    className="shrink-0 h-auto"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
       </div>
