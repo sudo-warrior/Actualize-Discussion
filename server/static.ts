@@ -4,26 +4,39 @@ import path from "path";
 
 export function serveStatic(app: Express) {
   // In production, the server runs from /app/dist/index.cjs
-  // So we need to go up one directory to find public
-  const distPath = path.resolve(__dirname, "../public");
+  // __dirname will be /app/dist, so ../public becomes /app/public
+  // But we created a symlink: /app/public -> /app/dist/public
+  const publicPath = path.resolve(__dirname, "../public");
   
-  console.log(`[static] Looking for static files at: ${distPath}`);
-  console.log(`[static] Exists: ${fs.existsSync(distPath)}`);
+  console.log(`[static] __dirname: ${__dirname}`);
+  console.log(`[static] Looking for static files at: ${publicPath}`);
+  console.log(`[static] Exists: ${fs.existsSync(publicPath)}`);
   
-  if (!fs.existsSync(distPath)) {
+  if (fs.existsSync(publicPath)) {
+    const assetsPath = path.join(publicPath, 'assets');
+    console.log(`[static] Assets path: ${assetsPath}`);
+    console.log(`[static] Assets exists: ${fs.existsSync(assetsPath)}`);
+    
+    if (fs.existsSync(assetsPath)) {
+      const files = fs.readdirSync(assetsPath);
+      console.log(`[static] Assets files: ${files.join(', ')}`);
+    }
+  }
+  
+  if (!fs.existsSync(publicPath)) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory: ${publicPath}, make sure to build the client first`,
     );
   }
 
   // Serve static files with proper MIME types
-  app.use(express.static(distPath, {
+  app.use(express.static(publicPath, {
     setHeaders: (res, filePath) => {
       // Set correct MIME types for assets
       if (filePath.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       } else if (filePath.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css');
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
       }
     }
   }));
@@ -42,6 +55,6 @@ export function serveStatic(app: Express) {
     }
     
     // Serve index.html for all other routes (SPA routing)
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile(path.resolve(publicPath, "index.html"));
   });
 }
