@@ -2,9 +2,9 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies - use --ignore-scripts to avoid platform issues
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm install --ignore-scripts --legacy-peer-deps || npm install --force --legacy-peer-deps
 
 # Copy source and build
 COPY . .
