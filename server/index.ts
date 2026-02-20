@@ -1,3 +1,7 @@
+import dns from "dns";
+// Force IPv4 first — Node 20+ Happy Eyeballs tries IPv6 which may be unreachable
+dns.setDefaultResultOrder("ipv4first");
+
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
