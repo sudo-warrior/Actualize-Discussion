@@ -110,14 +110,14 @@ export default function Landing() {
                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/30 border border-yellow-500/50" />
                 <div className="w-2.5 h-2.5 rounded-full bg-green-500/30 border border-green-500/50" />
               </div>
-              <span className="text-xs font-mono text-muted-foreground ml-2">terminal — incident-cmd</span>
+              <span className="text-xs font-mono text-muted-foreground ml-2">terminal - incident-cmd</span>
             </div>
             <div className="p-6 font-mono text-sm space-y-2 bg-black/40">
               <div className="text-muted-foreground">
                 <span className="text-green-500">$</span> incident analyze production.log
               </div>
               <div className="text-amber-400/80">
-                [WARN] QueuePool limit exceeded — 15/15 connections in use
+                [WARN] QueuePool limit exceeded - 15/15 connections in use
               </div>
               <div className="text-red-400/80">
                 [ERROR] sqlalchemy.exc.TimeoutError: QueuePool limit reached
@@ -138,7 +138,7 @@ export default function Landing() {
       </main>
 
       <footer className="relative z-10 border-t border-border/50 py-6 text-center text-xs text-muted-foreground font-mono">
-        INCIDENT.CMD &copy; {new Date().getFullYear()} — AI-Powered Incident Analysis
+        INCIDENT.CMD &copy; {new Date().getFullYear()} - AI-Powered Incident Analysis
       </footer>
     </div>
   );

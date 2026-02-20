@@ -15,14 +15,14 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Directory Structure
-- `client/` — React frontend (Vite-based SPA)
-- `server/` — Express backend API
-- `server/auth.ts` — Supabase authentication middleware
-- `server/foxit-pdf.ts` — Foxit Fusion API integration for PDF export
-- `server/supabase.ts` — Server-side Supabase client
-- `server/replit_integrations/` — AI modules (chat, batch)
-- `shared/` — Shared TypeScript types and database schema
-- `shared/models/` — Sub-schemas (auth.ts, chat.ts)
+- `client/` - React frontend (Vite-based SPA)
+- `server/` - Express backend API
+- `server/auth.ts` - Supabase authentication middleware
+- `server/foxit-pdf.ts` - Foxit Fusion API integration for PDF export
+- `server/supabase.ts` - Server-side Supabase client
+- `server/replit_integrations/` - AI modules (chat, batch)
+- `shared/` - Shared TypeScript types and database schema
+- `shared/models/` - Sub-schemas (auth.ts, chat.ts)
 
 ### Frontend Architecture
 - **Framework**: React with TypeScript, bundled by Vite
@@ -31,7 +31,7 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: TanStack React Query for server state, local React state for UI
 - **UI Components**: shadcn/ui component library (new-york style) built on Radix UI primitives
 - **Styling**: Tailwind CSS v4 with CSS variables for theming, dark mode by default
-- **Fonts**: Space Grotesk (sans) and JetBrains Mono (mono) — terminal/command aesthetic
+- **Fonts**: Space Grotesk (sans) and JetBrains Mono (mono) - terminal/command aesthetic
 - **Animations**: Framer Motion for transitions
 - **API Communication**: Custom `apiRequest` utility wrapping fetch, integrated with React Query's `queryFn`
 
@@ -42,24 +42,24 @@ Preferred communication style: Simple, everyday language.
 - **PDF Export**: Foxit Fusion API for generating watermarked, searchable (OCR) reports with conversation history.
 - **API Pattern**: RESTful JSON API under `/api/` (authenticated) and `/api/v1/` (API key auth)
 - **Key Endpoints** (session-protected via `isAuthenticated` middleware):
-  - `POST /api/incidents/analyze` — Submit logs for AI analysis, creates an incident record
-  - `GET /api/incidents` — List user's incidents (filtered by userId)
-  - `GET /api/incidents/:id` — Get single incident details
-  - `PATCH /api/incidents/:id/status` — Update incident status
-  - `GET /api/incidents/stats/summary` — Dashboard metrics (real data from DB)
-  - `POST /api/keys` — Create a new API key (returns raw key once)
-  - `GET /api/keys` — List user's API keys (prefix only, no raw keys)
-  - `DELETE /api/keys/:id` — Revoke an API key
-  - `POST /api/incidents/:id/export/pdf` — Export incident as enhanced PDF
-  - `POST /api/incidents/export/bulk` — Export multiple incidents in a single merged PDF
-  - `GET /api/auth/user` — Get current Supabase user
-  - `POST /api/login` — Begin Supabase Magic Link flow
+  - `POST /api/incidents/analyze` - Submit logs for AI analysis, creates an incident record
+  - `GET /api/incidents` - List user's incidents (filtered by userId)
+  - `GET /api/incidents/:id` - Get single incident details
+  - `PATCH /api/incidents/:id/status` - Update incident status
+  - `GET /api/incidents/stats/summary` - Dashboard metrics (real data from DB)
+  - `POST /api/keys` - Create a new API key (returns raw key once)
+  - `GET /api/keys` - List user's API keys (prefix only, no raw keys)
+  - `DELETE /api/keys/:id` - Revoke an API key
+  - `POST /api/incidents/:id/export/pdf` - Export incident as enhanced PDF
+  - `POST /api/incidents/export/bulk` - Export multiple incidents in a single merged PDF
+  - `GET /api/auth/user` - Get current Supabase user
+  - `POST /api/login` - Begin Supabase Magic Link flow
 - **Developer API v1 Endpoints** (API key auth via `apiKeyAuth` middleware, `Authorization: Bearer` or `X-API-Key`):
-  - `POST /api/v1/incidents/analyze` — Submit logs for analysis
-  - `GET /api/v1/incidents` — List incidents
-  - `GET /api/v1/incidents/:id` — Get incident details
-  - `PATCH /api/v1/incidents/:id/status` — Update incident status
-  - `DELETE /api/v1/incidents/:id` — Delete an incident
+  - `POST /api/v1/incidents/analyze` - Submit logs for analysis
+  - `GET /api/v1/incidents` - List incidents
+  - `GET /api/v1/incidents/:id` - Get incident details
+  - `PATCH /api/v1/incidents/:id/status` - Update incident status
+  - `DELETE /api/v1/incidents/:id` - Delete an incident
 - **API Key Security**: Keys are hashed (SHA-256) before storage; only the prefix (`ic_xxxxxxxx`) is stored in plaintext. Raw key shown once on creation. Keys can be revoked. `lastUsedAt` tracked per key.
 - **Log Analysis**: Gemini AI with strict prompt engineering (only analyzes logs, rejects non-log input). Falls back to regex pattern matching if AI is unavailable.
 - **Validation**: Zod schemas (shared between client and server via `drizzle-zod`)
@@ -70,12 +70,12 @@ Preferred communication style: Simple, everyday language.
 - **DB Module**: `server/db.ts` exports shared `db` instance used by all storage modules
 - **Schema Push**: Use `npm run db:push` to sync schema to database
 - **Tables**:
-  - `incidents` — id, userId, title, severity, status, rootCause, fix, evidence[], nextSteps[], completedSteps[], stepGuidance[], createdAt
-  - `api_keys` — id, userId, name, keyHash, keyPrefix, requestCount, lastResetDate, lastUsedAt
-  - `templates` — Pre-defined log templates for analysis
-  - `tags` / `incident_tags` — Organizing incidents
-  - `favorites` — User-starred incidents
-  - `conversations` / `messages` — Follow-up discussions linked to incidents/steps
+  - `incidents` - id, userId, title, severity, status, rootCause, fix, evidence[], nextSteps[], completedSteps[], stepGuidance[], createdAt
+  - `api_keys` - id, userId, name, keyHash, keyPrefix, requestCount, lastResetDate, lastUsedAt
+  - `templates` - Pre-defined log templates for analysis
+  - `tags` / `incident_tags` - Organizing incidents
+  - `favorites` - User-starred incidents
+  - `conversations` / `messages` - Follow-up discussions linked to incidents/steps
 - **Storage Layer**: `DatabaseStorage` class in `server/storage.ts` using Drizzle ORM
 
 ### Build System
@@ -124,13 +124,13 @@ Copy `.env.example` to `.env` and configure:
 - `DATABASE_URL`: PostgreSQL connection string (Neon or similar)
 
 ## Key NPM Packages
-- **@supabase/supabase-js** — Supabase client for auth and data
-- **axios** — HTTP client for Foxit API communication
-- **drizzle-orm** + **drizzle-kit** — Database ORM and migrations
-- **express** v5 — Backend API framework
-- **@google/genai** — Gemini AI integration
-- **@tanstack/react-query** — Frontend state and data fetching
-- **framer-motion** — UI animations and transitions
-- **lucide-react** — Icon system
-- **wouter** — Client-side routing
-- **zod** — Schema validation and type safety
+- **@supabase/supabase-js** - Supabase client for auth and data
+- **axios** - HTTP client for Foxit API communication
+- **drizzle-orm** + **drizzle-kit** - Database ORM and migrations
+- **express** v5 - Backend API framework
+- **@google/genai** - Gemini AI integration
+- **@tanstack/react-query** - Frontend state and data fetching
+- **framer-motion** - UI animations and transitions
+- **lucide-react** - Icon system
+- **wouter** - Client-side routing
+- **zod** - Schema validation and type safety
